@@ -174,9 +174,12 @@ input,select{font-family:inherit}
 <div class="scr hidden" id="screen-main">
   <div class="hdr hdr-bg">
     <div class="hdr-l"><div class="t1">現場工具管理</div><div class="t2" id="hdr-site"></div></div>
-    <button class="hdr-user" onclick="openUserMenu()">
-      <div class="av" id="hdr-av" style="color:#1a56db">?</div>
-      <span id="hdr-uname">---</span>
+    <button class="hdr-user" onclick="confirmLogout()" style="flex-direction:column;align-items:flex-end;padding:5px 10px;gap:2px;border-radius:14px">
+      <div style="display:flex;align-items:center;gap:5px">
+        <div class="av" id="hdr-av" style="color:#1a56db">?</div>
+        <span id="hdr-uname">---</span>
+      </div>
+      <span style="font-size:9px;opacity:0.75">タップしてログアウト</span>
     </button>
   </div>
   <div class="main-body">
@@ -309,7 +312,7 @@ function closeModal(){
 }
 function onModalBgClick(e){if(e.target===document.getElementById('modal-bg'))closeModal();}
 function showScreen(id){document.querySelectorAll('.scr').forEach(function(s){s.className='scr hidden';});document.getElementById(id).className='scr';}
-function getStatus(item){if(item.mach)return 'machine';var ci=getCompanyInfo(item);if(ci.inCompany<=5)return 'danger';return 'ok';}
+function getStatus(item){var ci=getCompanyInfo(item);if(ci.inCompany<=5)return 'danger';if(item.mach)return 'machine';return 'ok';}
 function findItem(id){return items.find(function(x){return x.id===id;})||null;}
 function findSite(id){return sites.find(function(x){return x.id===id;})||null;}
 function findTM(id){return TM.find(function(x){return x.id===id;})||null;}
@@ -462,7 +465,7 @@ function renderInventory(){
     var ci=getCompanyInfo(item);
     h+='<div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;min-width:96px">';
     // 会社残数（緑）
-    var compLow=ci.inCompany<=5&&!item.mach;
+    var compLow=item.mach?(ci.inCompany===0):(ci.inCompany<=5);
     h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 8px;background:'+(compLow?'#fef2f2':'#f0fdf4')+';border:1px solid '+(compLow?'#fecaca':'#bbf7d0')+';border-radius:8px">';
     h+='<span style="font-size:9px;color:'+(compLow?'#b91c1c':'#15803d')+';font-weight:600">会社残数</span>';
     h+='<span style="font-size:16px;font-weight:700;color:'+(compLow?'#dc2626':'#15803d')+';line-height:1">'+ci.inCompany+'<span style="font-size:9px;margin-left:1px">'+esc(item.unit)+'</span></span>';
@@ -574,7 +577,7 @@ function openDetailById(itemId){
   // 大きく２つの数字を表示
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">';
   // 会社残
-  var compLow=ci.inCompany<=5&&!item.mach;
+  var compLow=item.mach?(ci.inCompany===0):(ci.inCompany<=5);
   h+='<div style="text-align:center;background:'+(compLow?'#fef2f2':'#f0fdf4')+';border:1px solid '+(compLow?'#fecaca':'#bbf7d0')+';border-radius:12px;padding:14px 6px">';
   h+='<div style="font-size:11px;color:'+(compLow?'#b91c1c':'#15803d')+';font-weight:700;margin-bottom:4px">会社残数</div>';
   h+='<div style="font-size:30px;font-weight:700;color:'+(compLow?'#dc2626':'#15803d')+';line-height:1">'+ci.inCompany+'</div>';
@@ -914,10 +917,19 @@ function openUserMenu(){
   var h='<div style="display:flex;align-items:center;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid #f1f5f9">';
   h+='<div style="width:44px;height:44px;border-radius:50%;background:'+c[0]+';color:'+c[1]+';display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;margin-right:12px;flex-shrink:0">'+esc(curUser.charAt(0))+'</div>';
   h+='<div><div style="font-size:16px;font-weight:700;color:#1e293b">'+esc(curUser)+'</div><div style="font-size:11px;color:#64748b;margin-top:2px">'+role+'</div></div></div>';
-  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">閉じる</button><button class="btn-danger" onclick="doLogout()">ログアウト</button></div>';
+  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">閉じる</button><button class="btn-danger" onclick="confirmLogout()">ログアウト</button></div>';
   showModal(h);
 }
 function doLogout(){closeModal();showScreen('screen-name');renderNameScreen();}
+function confirmLogout(){
+  var h='<div style="text-align:center;padding:12px 0">';
+  h+='<div style="font-size:44px;margin-bottom:12px">👋</div>';
+  h+='<div style="font-size:16px;font-weight:700;color:#1e293b;margin-bottom:8px">ログアウトしますか？</div>';
+  h+='<div style="font-size:13px;color:#64748b;margin-bottom:20px">'+esc(curUser)+'としてログイン中です</div>';
+  h+='</div>';
+  h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">キャンセル</button><button class="btn-danger" style="flex:2" onclick="doLogout()">ログアウト</button></div>';
+  showModal(h);
+}
 
 // ============================================================
 // 管理者 - 現場管理
