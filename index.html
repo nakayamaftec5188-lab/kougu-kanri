@@ -345,7 +345,7 @@ function getCompanyInfo(item){
   if(!tm)return {total:item.total,atSites:item.qty,inRepair:0,inCompany:0};
   var totalAtSites=0;
   items.forEach(function(x){if(x.ref===item.ref)totalAtSites+=x.qty||0;});
-  var inRepair=repairs.filter(function(r){return r.tmId===item.ref;}).reduce(function(s,r){return s+(r.qty||0);},0);
+  var inRepair=repairs.filter(function(r){return r.tmId===item.ref;}).reduce(function(s,r){return s+(r.qty||1);},0);
   return {total:tm.total,atSites:totalAtSites,inRepair:inRepair,inCompany:Math.max(0,tm.total-totalAtSites-inRepair)};
 }
 function AC(i){var c=[['#dbeafe','#1e40af'],['#dcfce7','#166534'],['#fef9c3','#854d0e'],['#ede9fe','#5b21b6'],['#ffedd5','#9a3412'],['#fce7f3','#9d174d'],['#f0fdf4','#14532d'],['#fff7ed','#7c2d12'],['#ecfdf5','#065f46'],['#fdf4ff','#7e22ce'],['#e0f2fe','#0369a1']];return c[i%c.length];}
@@ -656,17 +656,16 @@ function openRepairEdit(rid){
   var h='<div class="modal-title">'+(r?'修理編集':'修理登録')+'</div>';
   h+='<div class="photo-area" id="repair-photo-area" onclick="triggerRepairPhoto()">'+pp+'</div>';
   h+='<input type="file" id="repair-photo-inp" accept="image/*" style="display:none" onchange="handleRepairPhoto(event)">';
-  h+='<label class="lbl">工具を選択</label>';
-  h+='<select id="rep-tm" class="sel">';
-  h+='<option value="">工具を選択してください</option>';
-  TM.forEach(function(t){h+='<option value="'+t.id+'"'+(r&&r.tmId===t.id?' selected':'')+'>'+esc(t.name)+'</option>';});
-  h+='</select>';
+  h+='<label class="lbl">工具を選択 <span id="rep-tm-selected" style="font-size:11px;color:#1a56db;font-weight:600;margin-left:6px"></span></label>';
+  h+='<input type="hidden" id="rep-tm" value="'+(r?r.tmId:'')+'">';
+  h+='<div id="rep-tm-picker"></div>';
   h+='<label class="lbl">どこの現場で修理が必要となったか</label>';
   h+='<select id="rep-site" class="sel">';
   h+='<option value="">現場を選択</option>';
+  h+='<option value="__company"'+(r&&r.siteId==='__company'?' selected':'')+'>🏢 会社</option>';
   sites.forEach(function(s){h+='<option value="'+s.id+'"'+(r&&r.siteId===s.id?' selected':'')+'>'+esc(s.name)+'</option>';});
   h+='</select>';
-  h+='<label class="lbl">修理する数量</label>';
+  h+='<label class="lbl">修理する数量 <span id="rep-qty-hint" style="font-size:10px;color:#94a3b8;margin-left:6px"></span></label>';
   h+='<div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:14px">';
   h+='<button onclick="repQtyAdj(-1)" style="width:44px;height:44px;border-radius:50%;background:#f1f5f9;border:2px solid #e2e8f0;font-size:20px;font-weight:700;color:#475569;cursor:pointer;font-family:inherit">▼</button>';
   h+='<input id="rep-qty" type="number" min="1" value="'+(r?r.qty||1:1)+'" inputmode="numeric" style="width:100px;font-size:26px;font-weight:700;text-align:center;padding:8px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;-webkit-appearance:none">';
@@ -680,6 +679,64 @@ function openRepairEdit(rid){
   h+='<button class="btn-primary" onclick="saveRepair()">保存</button>';
   h+='</div>';
   showModal(h);
+  _repKanaRow=''; _repKana='';
+  renderRepTmPicker();
+  setTimeout(onRepTmChange,50);
+}
+var _repKanaRow='', _repKana='';
+function renderRepTmPicker(){
+  var picker=document.getElementById('rep-tm-picker'); if(!picker)return;
+  var curId=document.getElementById('rep-tm').value;
+  var kanas=TM.reduce(function(a,t){(t.yomis||[t.yomi||'']).forEach(function(y){if(y&&a.indexOf(y)<0)a.push(y);});return a;},[]).sort();
+  var activeRows={};
+  kanas.forEach(function(k){var r=getKanaRow(k);if(r)activeRows[r]=true;});
+  var disp=_repKana?TM.filter(function(t){return (t.yomis||[t.yomi||'']).indexOf(_repKana)>=0;}):(_repKanaRow?TM.filter(function(t){return (t.yomis||[t.yomi||'']).some(function(y){return getKanaRow(y)===_repKanaRow;});}):TM);
+  var h='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">';
+  KANA_ROWS.forEach(function(r){
+    if(!activeRows[r.head])return;
+    var active=_repKanaRow===r.head;
+    h+='<button type="button" class="kana-btn'+(active?' active':'')+'" onclick="setRepKanaRow(\''+r.head+'\')" style="'+(active?'background:#1a56db;color:#fff;border-color:#1a56db;':'')+'min-width:32px">'+r.head+'</button>';
+  });
+  if(_repKanaRow||_repKana)h+='<button type="button" class="kana-btn" onclick="clearRepKana()" style="color:#dc2626;border-color:#fecaca">✕ 全て</button>';
+  h+='</div>';
+  if(_repKanaRow){
+    var row=KANA_ROWS.find(function(r){return r.head===_repKanaRow;});
+    if(row){
+      h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px;background:#eff6ff;border-radius:8px">';
+      row.chars.forEach(function(c){
+        if(kanas.indexOf(c)<0)return;
+        var active=_repKana===c;
+        h+='<button type="button" class="kana-btn'+(active?' active':'')+'" onclick="setRepKana(\''+c+'\')" style="'+(active?'background:#1a56db;color:#fff;border-color:#1a56db;':'background:#fff;')+'min-width:32px">'+c+'</button>';
+      });
+      h+='</div>';
+    }
+  }
+  h+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;max-height:200px;overflow-y:auto;margin-bottom:12px">';
+  if(!disp.length){h+='<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px">該当する工具がありません</div>';}
+  disp.forEach(function(t){
+    var sel=curId===t.id;
+    var photo=t.photo||'';
+    var img=isPhoto(photo)?'<img src="'+photo+'" style="width:36px;height:24px;border-radius:6px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:9px">':'<div style="width:36px;height:24px;border-radius:6px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-right:9px">🔧</div>';
+    h+='<div onclick="selectRepTm(\''+t.id+'\')" style="display:flex;align-items:center;padding:8px 6px;border-bottom:1px solid #f1f5f9;cursor:pointer;'+(sel?'background:#eff6ff;border-radius:6px;':'')+'">';
+    h+=img;
+    h+='<div style="flex:1;font-size:13px;color:#1e293b;font-weight:'+(sel?'700':'500')+'">'+esc(t.name)+'</div>';
+    if(sel)h+='<span style="font-size:14px;color:#1a56db">✓</span>';
+    h+='</div>';
+  });
+  h+='</div>';
+  picker.innerHTML=h;
+  // 選択中の工具名を表示
+  var lbl=document.getElementById('rep-tm-selected');
+  if(lbl){var tm=curId?findTM(curId):null;lbl.textContent=tm?'→ '+tm.name:'';}
+}
+function setRepKanaRow(r){_repKanaRow=r;_repKana='';renderRepTmPicker();}
+function setRepKana(k){_repKana=k;renderRepTmPicker();}
+function clearRepKana(){_repKanaRow='';_repKana='';renderRepTmPicker();}
+function selectRepTm(id){
+  var hid=document.getElementById('rep-tm');
+  if(hid)hid.value=id;
+  renderRepTmPicker();
+  onRepTmChange();
 }
 function triggerRepairPhoto(){var e=document.getElementById('repair-photo-inp');if(e)e.click();}
 function handleRepairPhoto(e){
@@ -701,7 +758,36 @@ function doDeleteRepair(rid){
   toast('修理記録を削除しました');
   openRepairModal();
 }
-function repQtyAdj(d){var el=document.getElementById('rep-qty');if(!el)return;var v=parseInt(el.value)||1;el.value=Math.max(1,v+d);}
+function repQtyAdj(d){
+  var el=document.getElementById('rep-qty');if(!el)return;
+  var v=parseInt(el.value)||1;
+  var max=getRepairMaxQty();
+  var newV=Math.max(1,v+d);
+  if(max>0&&newV>max)newV=max;
+  el.value=newV;
+}
+function getRepairMaxQty(){
+  var sel=document.getElementById('rep-tm');
+  if(!sel||!sel.value)return 0;
+  var tm=findTM(sel.value); if(!tm)return 0;
+  var atSites=0;
+  items.forEach(function(x){if(x.ref===tm.id)atSites+=x.qty||0;});
+  var inRep=repairs.filter(function(r){return r.tmId===tm.id&&r.id!==_repairEditId;}).reduce(function(s,r){return s+(r.qty||1);},0);
+  return Math.max(0,tm.total-atSites-inRep);
+}
+function onRepTmChange(){
+  var max=getRepairMaxQty();
+  var sel=document.getElementById('rep-tm');
+  var tm=sel&&sel.value?findTM(sel.value):null;
+  var hint=document.getElementById('rep-qty-hint');
+  if(hint)hint.textContent=tm?'（修理可能 最大'+max+tm.unit+'）':'';
+  var qEl=document.getElementById('rep-qty');
+  if(qEl){
+    qEl.max=max||1;
+    var v=parseInt(qEl.value)||1;
+    if(max>0&&v>max)qEl.value=max;
+  }
+}
 function saveRepair(){
   var tmId=document.getElementById('rep-tm').value;
   if(!tmId){toast('工具を選択してください');return;}
@@ -709,8 +795,13 @@ function saveRepair(){
   var issue=document.getElementById('rep-issue').value.trim();
   var qEl=document.getElementById('rep-qty');
   var qty=qEl?Math.max(1,parseInt(qEl.value)||1):1;
+  var max=getRepairMaxQty();
+  if(max>0&&qty>max){toast('修理可能数を超えています（最大'+max+'）');return;}
+  if(max===0){toast('この工具は修理可能数が0です');return;}
   var tm=findTM(tmId);
-  var s=siteId?findSite(siteId):null;
+  var s=null;
+  if(siteId==='__company'){s={name:'会社'};}
+  else if(siteId){s=findSite(siteId);}
   if(_repairEditId){
     var r=repairs.find(function(x){return x.id===_repairEditId;});
     if(r){
@@ -731,11 +822,12 @@ function saveRepair(){
 function openCompanyStock(){
   var h='<div class="modal-title">🏢 会社在庫</div><div class="modal-sub">全工具の会社残数と持出し先現場</div>';
   h+='<div style="max-height:60vh;overflow-y:auto;margin-bottom:12px">';
-  TM.slice().sort(function(a,b){
-    var ca=Math.max(0,a.total-items.filter(function(x){return x.ref===a.id;}).reduce(function(s,x){return s+(x.qty||0);},0));
-    var cb=Math.max(0,b.total-items.filter(function(x){return x.ref===b.id;}).reduce(function(s,x){return s+(x.qty||0);},0));
-    return ca-cb;
-  }).forEach(function(tm){
+  function calcInCompany(tm){
+    var atSites=items.filter(function(x){return x.ref===tm.id;}).reduce(function(s,x){return s+(x.qty||0);},0);
+    var inRep=repairs.filter(function(r){return r.tmId===tm.id;}).reduce(function(s,r){return s+(r.qty||1);},0);
+    return Math.max(0,tm.total-atSites-inRep);
+  }
+  TM.slice().sort(function(a,b){return calcInCompany(a)-calcInCompany(b);}).forEach(function(tm){
     var totalAtSites=0, sitesWithTool=[];
     items.forEach(function(x){
       if(x.ref===tm.id){
@@ -743,7 +835,8 @@ function openCompanyStock(){
         if((x.qty||0)>0){var s=findSite(x.site);if(s)sitesWithTool.push({name:s.name,qty:x.qty});}
       }
     });
-    var inCompany=Math.max(0,tm.total-totalAtSites);
+    var inRep=repairs.filter(function(r){return r.tmId===tm.id;}).reduce(function(s,r){return s+(r.qty||1);},0);
+    var inCompany=Math.max(0,tm.total-totalAtSites-inRep);
     var low=inCompany<=5;
     var photo=tm.photo||'';
     var img=isPhoto(photo)?'<img src="'+photo+'" style="width:48px;height:36px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:10px">':'<div style="width:48px;height:36px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;margin-right:10px">'+esc(photo||'🔧')+'</div>';
@@ -752,6 +845,7 @@ function openCompanyStock(){
     h+='<div style="font-size:13px;font-weight:700;color:#1e293b">'+esc(tm.name)+'</div>';
     if(sitesWithTool.length){h+='<div style="font-size:10px;color:#64748b;margin-top:2px">📤 '+sitesWithTool.map(function(s){return esc(s.name)+' '+s.qty+esc(tm.unit);}).join(' ／ ')+'</div>';}
     else{h+='<div style="font-size:10px;color:#94a3b8;margin-top:2px">どの現場にも持出しなし</div>';}
+    if(inRep>0)h+='<div style="font-size:10px;color:#c2410c;margin-top:2px;font-weight:600">🔧 修理中 '+inRep+esc(tm.unit)+'</div>';
     h+='</div>';
     h+='<div style="text-align:right;flex-shrink:0;margin-left:8px">';
     h+='<div style="font-size:9px;color:'+(low?'#b91c1c':'#64748b')+';font-weight:600">会社残数</div>';
@@ -1104,7 +1198,7 @@ function delSiteFromBtn(el){showDeleteConfirm('site',el.dataset.id,el.dataset.na
 function openSiteEdit(idx){
   var s=sites[idx];
   var stools=s.tools||[];
-  window._seIdx=idx; window._seKana=''; window._seMergedTools=null;
+  window._seIdx=idx; window._seKana=''; window._seKanaRow=''; window._seMergedTools=null;
   var h='<div class="modal-title">'+(isAdmin?'現場編集：':'工具追加：')+esc(s.name)+'</div>';
   if(isAdmin){
     function mkSel(id,val){var h='<select id="'+id+'" class="sel"><option value="">（未設定）</option>';members.forEach(function(m){if(!m.admin)h+='<option'+(m.name===val?' selected':'')+'>'+esc(m.name)+'</option>';});return h+'</select>';}
@@ -1123,12 +1217,30 @@ function renderSiteToolPicker(stools){
   var stoolMap={};
   stools.forEach(function(s){if(s&&s.id)stoolMap[s.id]=s.qty||0;});
   var kanas=TM.reduce(function(a,t){(t.yomis||[t.yomi||'']).forEach(function(y){if(y&&a.indexOf(y)<0)a.push(y);});return a;},[]).sort();
+  var activeRows={};
+  kanas.forEach(function(k){var r=getKanaRow(k);if(r)activeRows[r]=true;});
   var disp=window._seKana?TM.filter(function(t){return (t.yomis||[t.yomi||'']).indexOf(window._seKana)>=0;}):TM;
   var h='<div style="margin-bottom:4px"><label class="lbl" style="margin-bottom:6px">使用する工具</label>';
-  h+='<div class="kana-wrap" style="margin-bottom:8px">';
-  kanas.forEach(function(k){h+='<button class="kana-btn'+(window._seKana===k?' active':'')+'" data-k="'+esc(k)+'" onclick="window._seKana=this.dataset.k;reRenderSitePicker()">'+esc(k)+'</button>';});
-  if(window._seKana)h+='<button class="kana-btn" onclick="clearSeKana()">✕ 全て</button>';
+  h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">';
+  KANA_ROWS.forEach(function(r){
+    if(!activeRows[r.head])return;
+    var active=window._seKanaRow===r.head;
+    h+='<button class="kana-btn'+(active?' active':'')+'" data-r="'+r.head+'" onclick="setSeKanaRow(this.dataset.r)" style="'+(active?'background:#1a56db;color:#fff;border-color:#1a56db;':'')+'min-width:32px">'+r.head+'</button>';
+  });
+  if(window._seKanaRow||window._seKana)h+='<button class="kana-btn" onclick="clearSeKana()" style="color:#dc2626;border-color:#fecaca">✕ 全て</button>';
   h+='</div>';
+  if(window._seKanaRow){
+    var row=KANA_ROWS.find(function(r){return r.head===window._seKanaRow;});
+    if(row){
+      h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;padding:6px;background:#eff6ff;border-radius:8px">';
+      row.chars.forEach(function(c){
+        if(kanas.indexOf(c)<0)return;
+        var active=window._seKana===c;
+        h+='<button class="kana-btn'+(active?' active':'')+'" data-k="'+c+'" onclick="setSeKana(this.dataset.k)" style="'+(active?'background:#1a56db;color:#fff;border-color:#1a56db;':'background:#fff;')+'min-width:32px">'+c+'</button>';
+      });
+      h+='</div>';
+    }
+  }
   h+='<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;max-height:220px;overflow-y:auto" id="se-tool-list">';
   disp.forEach(function(t){
     var chk=stoolMap.hasOwnProperty(t.id);
@@ -1170,7 +1282,9 @@ function seToolChkChange(el){
     b.style.background=el.checked?'#f1f5f9':'#f8fafc';
   });
 }
-function clearSeKana(){window._seKana='';reRenderSitePicker();}
+function clearSeKana(){window._seKana='';window._seKanaRow='';reRenderSitePicker();}
+function setSeKanaRow(r){window._seKanaRow=r;window._seKana='';reRenderSitePicker();}
+function setSeKana(k){window._seKana=k;reRenderSitePicker();}
 function collectSeTools(){
   // collect {id,qty} from current DOM state
   var result=[];
