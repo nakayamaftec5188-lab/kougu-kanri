@@ -1874,25 +1874,31 @@ function uploadPhoto(folderId, base64data, cb){
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  // POSTで送信（text/plainでプリフライトを回避）
+  // no-corsでPOST送信（リダイレクト問題を回避）
+  // レスポンスは読めないので、送信後にGASからURLをポーリングする代わりに
+  // Drive thumbnail URLを予測して返す方式を使う
+  var payload = JSON.stringify({
+    action:'uploadPhoto',
+    folderId:folderId,
+    fileName:fname,
+    mimeType:mime,
+    base64:b64
+  });
+  // まずno-corsで試みる
   fetch(GAS_URL,{
     method:'POST',
-    redirect:'follow',
-    body:JSON.stringify({
-      action:'uploadPhoto',
-      folderId:folderId,
-      fileName:fname,
-      mimeType:mime,
-      base64:b64
-    })
+    mode:'no-cors',
+    body:payload
   })
-  .then(function(r){return r.text();})
-  .then(function(t){
-    try{
-      var d=JSON.parse(t);
-      if(!d||!d.url){cb(null,base64data);return;}
-      cb(null,d.url);
-    }catch(e){cb(null,base64data);}
+  .then(function(){
+    // no-corsではレスポンスが読めないため
+    // GETで結果を取得する（ファイル名をキーに検索）
+    return fetch(GAS_URL+'?action=getPhotoUrl&folderId='+encodeURIComponent(folderId)+'&fileName='+encodeURIComponent(fname),{redirect:'follow'});
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d&&d.url){cb(null,d.url);}
+    else{cb(null,base64data);}
   })
   .catch(function(e){
     console.warn('写真アップロード失敗',e);
