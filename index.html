@@ -1796,7 +1796,7 @@ function cropApply(){
   if(target)target.innerHTML='<img src="'+dataUrl+'" alt="">';
   closeCropModal();
   // folderId判定：修理写真か工具写真か
-  var folderId = (_cropTargetId==='repair-photo-area'||_cropTargetId==='tme-photo-area')
+  var folderId = (_cropTargetId==='repair-photo-area')
     ? '1PL5JGdGksKFf6QPKmcmOz2XFL7iZiCYH'   // 修理写真フォルダ
     : '1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk';   // 工具写真フォルダ
   // GASへアップロード（バックグラウンド）
