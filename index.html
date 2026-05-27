@@ -1573,7 +1573,6 @@ function saveTMEdit(el){
     },500);
   }else{doSave();}
 }
-function saveTMEdit(el){ var id=el.dataset.tmid; }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
 function openAddTM(){
   var h='<div class="modal-title">新しい工具を追加</div>';
