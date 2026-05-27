@@ -1548,36 +1548,32 @@ function saveTMEdit(el){
   var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   var newCat=document.getElementById('tme-cat').value||'工具';
-  var newPhoto=window._tmePhotoData||t.photo||'';
-  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
-  items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
+  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0];
+  t.unit=document.getElementById('tme-unit').value||'個';
+  t.total=parseInt(document.getElementById('tme-total').value)||0;
+  items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;}});
   toast('更新しました'); renderTMModal();
   var _sid=id;
   function doSave(){
     var _t=findTM(_sid);
-    if(_t){_t.photo=window._tmePhotoData||_t.photo;items.forEach(function(x){if(x.ref===_sid)x.photo=_t.photo;});}
+    if(_t){
+      var url=window._tmePhotoData;
+      if(url&&url.indexOf('http')===0){
+        _t.photo=url;
+        items.forEach(function(x){if(x.ref===_sid)x.photo=url;});
+      }
+    }
     window._tmePhotoData='';
+    window._tmePhotoReady=undefined;
     saveAll(null);
   }
   if(window._tmePhotoReady===false){
-    var _chk=setInterval(function(){if(window._tmePhotoReady!==false){clearInterval(_chk);doSave();}},500);
+    var _chk=setInterval(function(){
+      if(window._tmePhotoReady!==false){clearInterval(_chk);doSave();}
+    },500);
   }else{doSave();}
 }
-function saveTMEdit(el){
-  var id=el.dataset.tmid, t=findTM(id); if(!t)return;
-  var name=document.getElementById('tme-name').value.trim();
-  if(!name){toast('工具名を入力してください');return;}
-  var oldName=t.name;
-  var yomiChks=document.querySelectorAll('.kana-btn.active[data-k]');
-  var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
-  if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
-  var newCat=document.getElementById('tme-cat').value||'工具';
-  var newPhoto=window._tmePhotoData||t.photo||'';
-  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
-  items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
-  toast('更新しました'); window._tmePhotoData=''; renderTMModal();
-  setTimeout(function(){ saveAll(null); }, 8000);
-}
+function saveTMEdit(el){ var id=el.dataset.tmid; }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
 function openAddTM(){
   var h='<div class="modal-title">新しい工具を追加</div>';
