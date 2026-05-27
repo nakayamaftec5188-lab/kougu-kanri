@@ -1801,17 +1801,35 @@ var _saving = false;
 async function uploadPhotoToGAS(base64, action, callback) {
   try {
     toast('📷 写真をアップロード中...');
-    var res = await gasPost({ action: action, base64: base64, filename: 'photo_' + Date.now() + '.jpg' });
+    // 写真を圧縮してから送る
+    var compressed = await compressBase64(base64, 400, 0.6);
+    var res = await gasPost({ action: action, base64: compressed, filename: 'photo_' + Date.now() + '.jpg' });
     if (res.ok && res.data && res.data.url) {
       callback(res.data.url);
       toast('📷 写真を保存しました');
     } else {
       toast('写真のアップロードに失敗しました');
+      console.error(res);
     }
   } catch(e) {
     toast('写真のアップロードに失敗しました');
     console.error(e);
   }
+}
+
+function compressBase64(base64, maxWidth, quality) {
+  return new Promise(function(resolve) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var w = img.width, h = img.height;
+      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = base64;
+  });
 }
 async function gasGet(action) {
   const r = await fetch(GAS_URL + '?action=' + action);
