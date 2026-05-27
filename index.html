@@ -1542,7 +1542,18 @@ function saveTMEdit(el){
   t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
   items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
   toast('更新しました'); window._tmePhotoData=''; renderTMModal();
-  saveAll(null);
+  if(newPhoto && newPhoto.indexOf('data:')===0){
+    // 写真アップロード中なのでURLが返ってから保存
+    var _tid=id;
+    uploadPhoto('1PbgWvVE9AlGmtqdv77gOTqBuC7C4yRkd', newPhoto, function(err, url){
+      if(url && url.indexOf('http')===0){
+        var _t=findTM(_tid); if(_t){_t.photo=url; items.forEach(function(x){if(x.ref===_tid)x.photo=url;});}
+      }
+      saveAll(null);
+    });
+  } else {
+    saveAll(null);
+  }
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
 function openAddTM(){
