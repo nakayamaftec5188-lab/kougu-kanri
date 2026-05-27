@@ -1527,7 +1527,14 @@ function triggerTMPhoto(){var e=document.getElementById('tme-photo-inp');if(e)e.
 function handleTMPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){window._tmePhotoData=cropped;});};
+  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){
+  window._tmePhotoData=cropped;
+  if(GAS_LOADED && cropped && cropped.indexOf('data:')===0){
+    uploadPhoto('1PbgWvVE9AlGmtqdv77gOTqBuC7C4yRkd', cropped, function(err, url){
+      if(url && url.indexOf('http')===0){ window._tmePhotoData=url; }
+    });
+  }
+});};
   r.readAsDataURL(f);
 }
 function saveTMEdit(el){
@@ -1535,25 +1542,10 @@ function saveTMEdit(el){
   var name=document.getElementById('tme-name').value.trim();
   if(!name){toast('工具名を入力してください');return;}
   var oldName=t.name;
-  var yomiChks=document.querySelectorAll('.kana-btn.active[data-k]');var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
-  if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
-  var newCat=document.getElementById('tme-cat').value||'工具';
-  var newPhoto=window._tmePhotoData||t.photo||'';
-  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
-  items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
-  toast('更新しました'); window._tmePhotoData=''; renderTMModal();
-  if(newPhoto && newPhoto.indexOf('data:')===0){
-    // 写真アップロード中なのでURLが返ってから保存
-    var _tid=id;
-    uploadPhoto('1PbgWvVE9AlGmtqdv77gOTqBuC7C4yRkd', newPhoto, function(err, url){
-      if(url && url.indexOf('http')===0){
-        var _t=findTM(_tid); if(_t){_t.photo=url; items.forEach(function(x){if(x.ref===_tid)x.photo=url;});}
-      }
-      saveAll(null);
-    });
-  } else {
-    saveAll(null);
-  }
+  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=window._tmePhotoData||t.photo||'';
+    items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=window._tmePhotoData||x.photo;}});
+    toast('更新しました'); window._tmePhotoData=''; renderTMModal();
+    setTimeout(function(){ saveAll(null); }, 8000);
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
 function openAddTM(){
