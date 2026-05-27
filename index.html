@@ -1874,22 +1874,30 @@ function uploadPhoto(folderId, base64data, cb){
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  // GETパラメータで送る（POSTのリダイレクト問題を回避）
-  var url=GAS_URL+'?action=uploadPhoto'
-    +'&folderId='+encodeURIComponent(folderId)
-    +'&fileName='+encodeURIComponent(fname)
-    +'&mimeType='+encodeURIComponent(mime)
-    +'&base64='+encodeURIComponent(b64);
-  fetch(url,{redirect:'follow'})
-    .then(function(r){return r.json();})
-    .then(function(d){
+  // POSTで送信（text/plainでプリフライトを回避）
+  fetch(GAS_URL,{
+    method:'POST',
+    redirect:'follow',
+    body:JSON.stringify({
+      action:'uploadPhoto',
+      folderId:folderId,
+      fileName:fname,
+      mimeType:mime,
+      base64:b64
+    })
+  })
+  .then(function(r){return r.text();})
+  .then(function(t){
+    try{
+      var d=JSON.parse(t);
       if(!d||!d.url){cb(null,base64data);return;}
       cb(null,d.url);
-    })
-    .catch(function(e){
-      console.warn('写真アップロード失敗',e);
-      cb(null,base64data);
-    });
+    }catch(e){cb(null,base64data);}
+  })
+  .catch(function(e){
+    console.warn('写真アップロード失敗',e);
+    cb(null,base64data);
+  });
 }
 
 // ============================================================
