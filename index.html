@@ -1839,7 +1839,7 @@ function gasGet(params, cb){
   var parts=[];
   Object.keys(params).forEach(function(k){parts.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k]));});
   url+=parts.join('&');
-  fetch(url)
+  fetch(url,{redirect:'follow'})
     .then(function(r){return r.json();})
     .then(function(d){cb(null,d);})
     .catch(function(e){cb(e,null);});
@@ -1847,10 +1847,9 @@ function gasGet(params, cb){
 
 // GAS POSTリクエスト
 function gasPost(body, cb){
-  // GASはContent-Type:application/jsonでプリフライトが起きるため
-  // text/plainで送ってGAS側でJSONパースする
   fetch(GAS_URL,{
     method:'POST',
+    redirect:'follow',
     headers:{'Content-Type':'text/plain'},
     body:JSON.stringify(body)
   })
