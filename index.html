@@ -386,12 +386,13 @@ function updateCnts(){
 // ============================================================
 function renderNameScreen(){
   // 一般ユーザーを先に、管理者を末尾に
-  var nonAdmins=members.map(function(m,i){return {m:m,i:i};}).filter(function(x){return !x.m.admin;});
-  var admins=members.map(function(m,i){return {m:m,i:i};}).filter(function(x){return x.m.admin;});
+  var nonAdmins=members.map(function(m,i){return {m:m,i:i};}).filter(function(x){return x.m&&!x.m.admin;});
+  var admins=members.map(function(m,i){return {m:m,i:i};}).filter(function(x){return x.m&&x.m.admin;});
   var sorted=nonAdmins.concat(admins);
   var h='';
   sorted.forEach(function(obj){
     var m=obj.m, i=obj.i, c=AC(i);
+    if(!m||typeof m.name!=='string'||!m.name)return;
     h+='<button class="member-btn" data-idx="'+i+'" onclick="selectMember(this)">';
     h+='<div class="member-av" style="background:'+c[0]+';color:'+c[1]+'">'+esc(m.name.charAt(0))+'</div>';
     h+='<div class="member-name">'+esc(m.name)+'</div><div class="arrow-r">›</div></button>';
