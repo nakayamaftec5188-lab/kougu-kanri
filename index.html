@@ -1805,12 +1805,12 @@ async function loadFromGAS() {
     const res = await gasGet('getAll');
     if (!res.ok) { console.error(res.error); return; }
     const d = res.data;
-    if (d.members && d.members.length) members = d.members;
-    if (d.sites   && d.sites.length)   sites   = d.sites;
-    if (d.TM      && d.TM.length)      TM      = d.TM;
-    if (d.items)                        items   = d.items;
+    if (d.members && d.members.length) members = d.members.map(function(m){ m.name=String(m.name||''); m.id=String(m.id||''); return m; });
+    if (d.sites   && d.sites.length)   sites   = d.sites.map(function(s){ s.name=String(s.name||''); s.id=String(s.id||''); s.chief=String(s.chief||''); s.leaders=(s.leaders||[]).map(function(l){return String(l||'');}); s.tools=s.tools||[]; return s; });
+    if (d.TM      && d.TM.length)      TM      = d.TM.map(function(t){ t.name=String(t.name||''); t.id=String(t.id||''); t.yomis=t.yomis||[]; t.unit=String(t.unit||''); t.total=Number(t.total)||0; t.photo=String(t.photo||''); t.cat=String(t.cat||'工具'); return t; });
+    if (d.items)                        items   = d.items.map(function(x){ x.name=String(x.name||''); x.id=String(x.id||''); x.unit=String(x.unit||''); x.photo=String(x.photo||''); x.note=String(x.note||''); x.ref=String(x.ref||''); return x; });
     if (d.hist)                         hist    = d.hist;
-    if (d.repairs)                      repairs = d.repairs;
+    if (d.repairs)                      repairs = d.repairs.map(function(r){ r.toolName=String(r.toolName||''); r.siteName=String(r.siteName||''); r.issue=String(r.issue||''); r.photo=String(r.photo||''); r.user=String(r.user||''); return r; });
     if (d.cfg)                          cfg     = d.cfg;
   } catch(e) {
     console.error('GAS接続エラー:', e);
