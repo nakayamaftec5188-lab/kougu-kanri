@@ -1903,14 +1903,32 @@ function loadAll(){
       if(err) toast('⚠ オフラインモード（データは保存されません）');
       return;
     }
-    // データを上書き（存在する場合のみ）
-    if(data.cfg) Object.assign(cfg, data.cfg);
-    if(data.members&&data.members.length) members=data.members;
-    if(data.sites&&data.sites.length) sites=data.sites;
-    if(data.TM&&data.TM.length) TM=data.TM;
-    if(data.items) items=data.items;
-    if(data.hist) hist=data.hist;
-    if(data.repairs) repairs=data.repairs;
+    // データを上書き（有効なデータのみ）
+    if(data.cfg&&typeof data.cfg==='object') Object.assign(cfg, data.cfg);
+    // membersは name が文字列のものだけ使う
+    if(data.members&&data.members.length){
+      var validMem=data.members.filter(function(m){return m&&typeof m.name==='string'&&m.name.length>0;});
+      if(validMem.length) members=validMem;
+    }
+    if(data.sites&&data.sites.length){
+      var validSites=data.sites.filter(function(s){return s&&typeof s.name==='string';});
+      if(validSites.length) sites=validSites.map(function(s){
+        s.leaders=Array.isArray(s.leaders)?s.leaders:['','',''];
+        s.tools=Array.isArray(s.tools)?s.tools:[];
+        return s;
+      });
+    }
+    if(data.TM&&data.TM.length){
+      var validTM=data.TM.filter(function(t){return t&&typeof t.name==='string';});
+      if(validTM.length) TM=validTM.map(function(t){
+        t.yomis=Array.isArray(t.yomis)?t.yomis:(t.yomi?[t.yomi]:[]);
+        t.total=parseInt(t.total)||0;
+        return t;
+      });
+    }
+    if(data.items&&Array.isArray(data.items)) items=data.items;
+    if(data.hist&&Array.isArray(data.hist)) hist=data.hist;
+    if(data.repairs&&Array.isArray(data.repairs)) repairs=data.repairs;
     GAS_LOADED=true;
     applyStyle();
     renderNameScreen();
