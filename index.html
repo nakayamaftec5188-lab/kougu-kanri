@@ -365,7 +365,7 @@ function getCompanyInfo(item){
 function AC(i){var c=[['#dbeafe','#1e40af'],['#dcfce7','#166534'],['#fef9c3','#854d0e'],['#ede9fe','#5b21b6'],['#ffedd5','#9a3412'],['#fce7f3','#9d174d'],['#f0fdf4','#14532d'],['#fff7ed','#7c2d12'],['#ecfdf5','#065f46'],['#fdf4ff','#7e22ce'],['#e0f2fe','#0369a1']];return c[i%c.length];}
 function catStyle(cat){if(cat==='工具')return 'background:#e8f0ff;color:#1241a8';if(cat==='機械')return 'background:#f1f5f9;color:#475569';if(cat==='保護具')return 'background:#f0fdf4;color:#166534';if(cat==='消耗品')return 'background:#fff7ed;color:#9a3412';return 'background:#fdf4ff;color:#7e22ce';}
 function uniqCats(list){var seen={},res=['all'];list.forEach(function(x){if(!seen[x.cat]){seen[x.cat]=true;res.push(x.cat);}});return res;}
-function isPhoto(p){return p&&p.indexOf('data:')===0;}
+function isPhoto(p){return p&&(p.indexOf('data:')===0||p.indexOf('http')===0);}
 function activeKanas(){var seen={};TM.forEach(function(t){(t.yomis||[t.yomi||'']).forEach(function(y){seen[y]=true;});});return Object.keys(seen).sort();}
 function applyStyle(){
   document.querySelectorAll('.hdr-bg').forEach(function(el){
@@ -1950,10 +1950,10 @@ function saveAll(cb){
       cfg:cfg,
       members:members,
       sites:sites,
-      TM:TM.map(function(t){return Object.assign({},t,{photo:isPhoto(t.photo)?'':t.photo});}),
-      items:items.map(function(x){return Object.assign({},x,{photo:isPhoto(x.photo)?'':x.photo});}),
+      TM:TM.map(function(t){var p=t.photo||'';return Object.assign({},t,{photo:p.indexOf('data:')===0?'':p});}),
+      items:items.map(function(x){var p=x.photo||'';return Object.assign({},x,{photo:p.indexOf('data:')===0?'':p});}),
       hist:hist,
-      repairs:repairs.map(function(r){return Object.assign({},r,{photo:isPhoto(r.photo)?'':r.photo});})
+      repairs:repairs.map(function(r){var p=r.photo||'';return Object.assign({},r,{photo:p.indexOf('data:')===0?'':p});})
     }
   },function(err,res){
     hideLoading();
