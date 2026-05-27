@@ -101,6 +101,7 @@ input,select{font-family:inherit}
 .kana-btn.active{background:#1a56db;color:#fff;border-color:#1a56db}
 .toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;font-size:11px;font-weight:600;padding:10px 18px;border-radius:20px;white-space:nowrap;opacity:0;transition:opacity .25s;z-index:200;pointer-events:none;max-width:90%}
 .toast.show{opacity:1}
+@keyframes spin{to{transform:rotate(360deg)}}
 .admin-btn{width:100%;display:flex;align-items:center;padding:16px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;margin-bottom:9px;cursor:pointer;font-family:inherit;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.04)}
 .admin-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;margin-right:13px;flex-shrink:0}
 </style>
@@ -206,12 +207,25 @@ input,select{font-family:inherit}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<!-- ローディングオーバーレイ -->
+<div id="loading-overlay" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:rgba(15,23,42,.72);z-index:999;align-items:center;justify-content:center;flex-direction:column">
+  <div style="background:#fff;border-radius:16px;padding:28px 32px;text-align:center;min-width:180px">
+    <div id="loading-spinner" style="width:40px;height:40px;border:4px solid #e2e8f0;border-top-color:#1a56db;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 14px"></div>
+    <div id="loading-msg" style="font-size:13px;font-weight:600;color:#1e293b">読み込み中...</div>
+  </div>
+</div>
 </div>
 
 <script>
 // ============================================================
 // データ
 // ============================================================
+// ============================================================
+// GAS連携設定
+// ============================================================
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbwzwwRA4s9S_5lUXQYLlzxRTxHFLZJ2mfCbJ4gVg9I26c02YaYgf2UScV3E_PeVvZRI/exec';
+var GAS_LOADED = false;  // 初回ロード完了フラグ
+
 var cfg = {title:'現場工具管理', color:'#1a56db', bg:''};
 var GOJUON = ['あ','い','う','え','お','か','き','く','け','こ','さ','し','す','せ','そ','た','ち','つ','て','と','な','に','ぬ','ね','の','は','ひ','ふ','へ','ほ','ま','み','む','め','も','や','ゆ','よ','ら','り','る','れ','ろ','わ','を','ん'];
 var KANA_ROWS = [
@@ -379,8 +393,8 @@ function renderNameScreen(){
   sorted.forEach(function(obj){
     var m=obj.m, i=obj.i, c=AC(i);
     h+='<button class="member-btn" data-idx="'+i+'" onclick="selectMember(this)">';
-    h+='<div class="member-av" style="background:'+c[0]+';color:'+c[1]+'">'+esc(String(m.name||'?').charAt(0))+'</div>';
-    h+='<div class="member-name">'+esc(String(m.name||''))+'</div><div class="arrow-r">›</div></button>';
+    h+='<div class="member-av" style="background:'+c[0]+';color:'+c[1]+'">'+esc(m.name.charAt(0))+'</div>';
+    h+='<div class="member-name">'+esc(m.name)+'</div><div class="arrow-r">›</div></button>';
   });
   document.getElementById('name-list').innerHTML=h;
 }
@@ -597,10 +611,10 @@ function execTransfer(){
   if(target){
     hist.unshift({ts:Date.now()+1,type:'in',iid:target.id,name:target.name,site:toSite,amt:_trQty,user:curUser,note:fromName+'より'+(_trNote?'（'+_trNote+'）':''),after:target.qty});
   }
-  saveToGAS();
   closeModal();
   toast('🚚 '+item.name+' '+_trQty+item.unit+' を'+toName+'へ移動しました');
   renderContent();
+  saveAll(null);
 }
 
 // ============================================================
@@ -647,7 +661,6 @@ function completeRepairFromBtn(el){
 function doCompleteRepair(rid){
   repairs=repairs.filter(function(r){return r.id!==rid;});
   toast('✅ 修理完了として削除しました');
-  saveToGAS();
   openRepairModal();
 }
 function openRepairEdit(rid){
@@ -744,10 +757,7 @@ function triggerRepairPhoto(){var e=document.getElementById('repair-photo-inp');
 function handleRepairPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'repair-photo-area',function(cropped){
-    _repairPhoto=cropped;
-    uploadPhotoToGAS(cropped,'uploadRepairPhoto',function(url){_repairPhoto=url;var pa=document.getElementById('repair-photo-area');if(pa)pa.innerHTML='<img src="'+url+'" alt="">';});
-  });};
+  r.onload=function(ev){openCropModal(ev.target.result,'repair-photo-area',function(cropped){_repairPhoto=cropped;});};
   r.readAsDataURL(f);
 }
 function deleteRepairConfirm(rid,name){
@@ -761,7 +771,6 @@ function deleteRepairConfirm(rid,name){
 function doDeleteRepair(rid){
   repairs=repairs.filter(function(r){return r.id!==rid;});
   toast('修理記録を削除しました');
-  saveToGAS();
   openRepairModal();
 }
 function repQtyAdj(d){
@@ -819,7 +828,8 @@ function saveRepair(){
     toast('🔧 修理を登録しました');
   }
   _repairEditId=null;_repairPhoto='';
-  saveToGAS();openRepairModal();
+  openRepairModal();
+  saveAll(null);
 }
 
 // ============================================================
@@ -915,8 +925,6 @@ function execAdjust(){
   var amt=qVal;
   if(amt<=0){toast('数量を入力してください');return;}
   var ci=getCompanyInfo(item);
-  // 持出し: 会社→現場 (現場qty +amt, 会社残数 -amt)
-  // 返却 : 現場→会社 (現場qty -amt, 会社残数 +amt)
   if(pendType==='out'){
     if(amt>ci.inCompany){toast('会社残数が足りません（残'+ci.inCompany+item.unit+'）');return;}
     item.qty+=amt;
@@ -925,11 +933,13 @@ function execAdjust(){
     item.qty-=amt;
   }
   var now=new Date(), ds=now.getFullYear()+'/'+(now.getMonth()+1)+'/'+now.getDate(), ts=('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2);
-  hist.unshift({ts:Date.now(),type:pendType,iid:item.id,name:item.name,site:item.site,amt:amt,user:curUser,note:note,after:item.qty});
+  var hEntry={ts:Date.now(),type:pendType,iid:item.id,name:item.name,site:item.site,amt:amt,user:curUser,note:note,after:item.qty};
+  hist.unshift(hEntry);
   window._adjNote=''; closeModal();
   toast((pendType==='out'?'📤':'📥')+' '+ds+' '+ts+' '+curUser+'が'+item.name+' '+amt+item.unit+(pendType==='out'?'を持出し':'を返却'));
-  saveToGAS();
   renderContent();
+  // GASへ差分送信
+  gasAdjust(hEntry, item.qty, null);
 }
 
 // ============================================================
@@ -998,10 +1008,7 @@ function triggerPhoto(){var e=document.getElementById('photo-inp');if(e)e.click(
 function handlePhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'photo-area',function(cropped){
-    photoData=cropped;
-    uploadPhotoToGAS(cropped,'uploadToolPhoto',function(url){photoData=url;var pa=document.getElementById('photo-area');if(pa)pa.innerHTML='<img src="'+url+'" alt="">';});
-  });};
+  r.onload=function(ev){openCropModal(ev.target.result,'photo-area',function(cropped){photoData=cropped;});};
   r.readAsDataURL(f);
 }
 function saveItem(){
@@ -1042,7 +1049,8 @@ function saveItem(){
     });
     toast('📦 '+name+' を '+added+'箇所に追加しました');
   }
-  photoData='';editId=null;saveToGAS();closeModal();renderContent();
+  photoData='';editId=null;closeModal();renderContent();
+  saveAll(null);
 }
 function deleteItem(){
   var item=findItem(editId); if(!item)return;
@@ -1077,10 +1085,10 @@ function confirmDel2(){
 }
 function cancelDel(){delType=null;delId=null;closeModal();}
 function execDel(){
-  if(delType==='item'){items=items.filter(function(x){return x.id!==delId;});editId=null;toast('品目を削除しました');saveToGAS();closeModal();renderContent();}
-  else if(delType==='member'){var nm=members.find(function(x){return x.id===delId;});var n=nm?nm.name:'';members=members.filter(function(x){return x.id!==delId;});if(n)sites.forEach(function(s){if(s.chief===n)s.chief='';s.leaders=s.leaders.map(function(l){return l===n?'':l;});});toast('メンバーを削除しました');saveToGAS();openMembersModal();}
-  else if(delType==='site'){var sid=delId;items=items.filter(function(x){return x.site!==sid;});sites=sites.filter(function(x){return x.id!==sid;});if(curSiteId===sid&&sites.length>0){curSiteId=sites[0].id;siteIdx=0;}toast('現場を削除しました');saveToGAS();openSitesModal();}
-  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('削除しました');saveToGAS();openToolMasterModal();}
+  if(delType==='item'){items=items.filter(function(x){return x.id!==delId;});editId=null;toast('品目を削除しました');closeModal();renderContent();saveAll(null);}
+  else if(delType==='member'){var nm=members.find(function(x){return x.id===delId;});var n=nm?nm.name:'';members=members.filter(function(x){return x.id!==delId;});if(n)sites.forEach(function(s){if(s.chief===n)s.chief='';s.leaders=s.leaders.map(function(l){return l===n?'':l;});});toast('メンバーを削除しました');openMembersModal();saveAll(null);}
+  else if(delType==='site'){var sid=delId;items=items.filter(function(x){return x.site!==sid;});sites=sites.filter(function(x){return x.id!==sid;});if(curSiteId===sid&&sites.length>0){curSiteId=sites[0].id;siteIdx=0;}toast('現場を削除しました');openSitesModal();saveAll(null);}
+  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('削除しました');openToolMasterModal();saveAll(null);}
   delType=null;delId=null;
 }
 
@@ -1358,7 +1366,8 @@ function saveSiteEdit(el){
     if(existing){existing.total=tm.total;existing.unit=tm.unit;existing.cat=tm.cat||existing.cat;}
     else{items.push({id:mkId(),name:tm.name,cat:tm.cat||'工具',site:siteId,unit:tm.unit,total:tm.total,qty:e.qty,mach:false,note:'',photo:tm.photo||'',ref:tm.id});}
   });
-  closeModal(); toast('現場情報を更新しました'); saveToGAS(); if(curSiteId)renderContent();
+  closeModal(); toast('現場情報を更新しました'); if(curSiteId)renderContent();
+  saveAll(null);
 }
 function openNewSiteModal(){
   var opts='<option value="">（未設定）</option>'; members.forEach(function(m){if(!m.admin)opts+='<option>'+esc(m.name)+'</option>';});
@@ -1375,8 +1384,9 @@ function saveNewSite(){
   var name=document.getElementById('ns-name').value.trim();
   if(!name){toast('現場名を入力してください');return;}
   sites.push({id:mkId(),name:name,chief:document.getElementById('ns-chief').value,leaders:[document.getElementById('ns-l0').value,document.getElementById('ns-l1').value,document.getElementById('ns-l2').value],tools:[]});
-  closeModal(); toast('現場「'+name+'」を追加しました'); saveToGAS(); renderSiteScreen();
+  closeModal(); toast('現場「'+name+'」を追加しました'); renderSiteScreen();
   if(curSiteId)renderSiteTabs();
+  saveAll(null);
 }
 
 // ============================================================
@@ -1410,7 +1420,7 @@ function openMembersModal(){
   members.forEach(function(m,i){
     var c=AC(i);
     h+='<div style="display:flex;align-items:center;padding:9px 0;border-bottom:1px solid #f1f5f9">';
-    h+='<div style="width:34px;height:34px;border-radius:50%;background:'+c[0]+';color:'+c[1]+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;margin-right:10px;flex-shrink:0">'+esc(String(m.name||'?').charAt(0))+'</div>';
+    h+='<div style="width:34px;height:34px;border-radius:50%;background:'+c[0]+';color:'+c[1]+';display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;margin-right:10px;flex-shrink:0">'+esc(m.name.charAt(0))+'</div>';
     h+='<div style="flex:1"><div style="font-size:14px;font-weight:600;color:#1e293b">'+esc(m.name)+'</div>';
     if(m.admin)h+='<div style="font-size:10px;color:#dc2626;font-weight:600">管理者</div>';
     h+='</div>';
@@ -1428,9 +1438,9 @@ function openMembersModal(){
 function openMemEditFromBtn(el){editMemIdx=parseInt(el.dataset.idx);openMemEdit();}
 function delMemFromBtn(el){showDeleteConfirm('member',el.dataset.id,el.dataset.name);}
 function openMemAdd(){showModal('<div class="modal-title">メンバー追加</div><label class="lbl">名前</label><input id="mem-name" class="inp" type="text" placeholder="例：田村 健"><div class="modal-actions"><button class="btn-cancel" onclick="openMembersModal()">戻る</button><button class="btn-primary" onclick="saveMemAdd()">追加</button></div>');}
-function saveMemAdd(){var name=document.getElementById('mem-name').value.trim();if(!name){toast('名前を入力してください');return;}members.push({id:mkId(),name:name,admin:false});toast('👤 '+name+' を追加しました');saveToGAS();openMembersModal();}
+function saveMemAdd(){var name=document.getElementById('mem-name').value.trim();if(!name){toast('名前を入力してください');return;}members.push({id:mkId(),name:name,admin:false});toast('👤 '+name+' を追加しました');openMembersModal();saveAll(null);}
 function openMemEdit(){var m=members[editMemIdx];if(!m)return;showModal('<div class="modal-title">メンバー編集</div><label class="lbl">名前</label><input id="mem-edit-name" class="inp" type="text" value="'+esc(m.name)+'"><div class="modal-actions"><button class="btn-cancel" onclick="openMembersModal()">戻る</button><button class="btn-primary" onclick="saveMemEdit()">保存</button></div>');}
-function saveMemEdit(){var name=document.getElementById('mem-edit-name').value.trim();if(!name){toast('名前を入力してください');return;}var old=members[editMemIdx].name;members[editMemIdx].name=name;if(old!==name)sites.forEach(function(s){if(s.chief===old)s.chief=name;s.leaders=s.leaders.map(function(l){return l===old?name:l;});});toast('更新しました');saveToGAS();openMembersModal();}
+function saveMemEdit(){var name=document.getElementById('mem-edit-name').value.trim();if(!name){toast('名前を入力してください');return;}var old=members[editMemIdx].name;members[editMemIdx].name=name;if(old!==name)sites.forEach(function(s){if(s.chief===old)s.chief=name;s.leaders=s.leaders.map(function(l){return l===old?name:l;});});toast('更新しました');openMembersModal();saveAll(null);}
 
 // ============================================================
 // 工具マスター管理
@@ -1516,10 +1526,7 @@ function triggerTMPhoto(){var e=document.getElementById('tme-photo-inp');if(e)e.
 function handleTMPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){
-    window._tmePhotoData=cropped;
-    uploadPhotoToGAS(cropped,'uploadToolPhoto',function(url){window._tmePhotoData=url;var pa=document.getElementById('tme-photo-area');if(pa)pa.innerHTML='<img src="'+url+'" alt="">';});
-  });};
+  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){window._tmePhotoData=cropped;});};
   r.readAsDataURL(f);
 }
 function saveTMEdit(el){
@@ -1533,7 +1540,8 @@ function saveTMEdit(el){
   var newPhoto=window._tmePhotoData||t.photo||'';
   t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
   items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
-  toast('更新しました'); saveToGAS(); window._tmePhotoData=''; renderTMModal();
+  toast('更新しました'); window._tmePhotoData=''; renderTMModal();
+  saveAll(null);
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
 function openAddTM(){
@@ -1558,7 +1566,8 @@ function saveTM(){
   var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   TM.push({id:mkId(),name:name,cat:document.getElementById('tm-cat').value||'工具',yomis:yomisArr,yomi:yomisArr[0],unit:document.getElementById('tm-unit').value.trim()||'個',total:parseInt(document.getElementById('tm-total').value)||0,photo:''});
-  toast('追加しました：'+name); saveToGAS(); updateCnts(); renderTMModal();
+  toast('追加しました：'+name); updateCnts(); renderTMModal();
+  saveAll(null);
 }
 
 // ============================================================
@@ -1647,7 +1656,7 @@ function cfgPrev(v){var p=document.getElementById('cfg-prev');if(p)p.textContent
 function triggerCfgPhoto(){var e=document.getElementById('cfg-photo');if(e)e.click();}
 function handleCfgPhoto(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){cfg.bg=ev.target.result;openAppSettings();};r.readAsDataURL(f);}
 function clearCfgBg(){cfg.bg='';openAppSettings();}
-function saveCfg(){var t=document.getElementById('cfg-title');if(t){var v=t.value.trim();if(v)cfg.title=v;}applyStyle();saveToGAS();closeModal();toast('アプリ設定を保存しました');}
+function saveCfg(){var t=document.getElementById('cfg-title');if(t){var v=t.value.trim();if(v)cfg.title=v;}applyStyle();closeModal();toast('アプリ設定を保存しました');saveAll(null);}
 
 // ============================================================
 // 写真クロップ
@@ -1781,101 +1790,186 @@ function cropApply(){
   var sw=vw/_cropScale, sh=vh/_cropScale;
   ctx.drawImage(img,sx,sy,sw,sh,0,0,OUT_W,OUT_H);
   var dataUrl=canvas.toDataURL('image/jpeg',0.92);
-  if(_cropCallback)_cropCallback(dataUrl);
+  // まずUIに反映（base64）
   var target=document.getElementById(_cropTargetId);
   if(target)target.innerHTML='<img src="'+dataUrl+'" alt="">';
   closeCropModal();
+  // folderId判定：修理写真か工具写真か
+  var folderId = (_cropTargetId==='repair-photo-area'||_cropTargetId==='tme-photo-area')
+    ? '1PL5JGdGksKFf6QPKmcmOz2XFL7iZiCYH'   // 修理写真フォルダ
+    : '1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk';   // 工具写真フォルダ
+  // GASへアップロード（バックグラウンド）
+  if(GAS_LOADED){
+    toast('📷 写真をアップロード中...');
+    uploadPhoto(folderId, dataUrl, function(err, url){
+      if(url && url!==dataUrl){
+        // URLが返ってきたらコールバックにURLを渡す
+        if(_cropCallback) _cropCallback(url);
+        // UIの画像はそのまま（base64表示を維持）
+        toast('✅ 写真を保存しました');
+      } else {
+        // フォールバック: base64のままコールバック
+        if(_cropCallback) _cropCallback(dataUrl);
+      }
+    });
+  } else {
+    // オフライン時はbase64のまま
+    if(_cropCallback) _cropCallback(dataUrl);
+  }
+}
+
+// ============================================================
+// GAS通信ユーティリティ
+// ============================================================
+function showLoading(msg){
+  var o=document.getElementById('loading-overlay');
+  var m=document.getElementById('loading-msg');
+  if(o){o.style.display='flex';}
+  if(m)m.textContent=msg||'処理中...';
+}
+function hideLoading(){
+  var o=document.getElementById('loading-overlay');
+  if(o)o.style.display='none';
+}
+
+// GAS GETリクエスト
+function gasGet(params, cb){
+  var url=GAS_URL+'?';
+  var parts=[];
+  Object.keys(params).forEach(function(k){parts.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k]));});
+  url+=parts.join('&');
+  fetch(url)
+    .then(function(r){return r.json();})
+    .then(function(d){cb(null,d);})
+    .catch(function(e){cb(e,null);});
+}
+
+// GAS POSTリクエスト
+function gasPost(body, cb){
+  fetch(GAS_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){cb(null,d);})
+  .catch(function(e){cb(e,null);});
+}
+
+// ============================================================
+// 写真アップロード（base64 → Google Drive → URL返却）
+// ============================================================
+// folderId: 'tool' か 'repair'
+// base64data: 'data:image/jpeg;base64,...'
+// cb(err, url) : DriveのURL or null
+function uploadPhoto(folderId, base64data, cb){
+  if(!base64data||base64data.indexOf('data:')<0){cb(null,'');return;}
+  // data:image/jpeg;base64,XXX → base64部分だけ取る
+  var parts=base64data.split(',');
+  var mime=parts[0].replace('data:','').replace(';base64','');
+  var b64=parts[1];
+  var ext=mime.indexOf('png')>=0?'.png':'.jpg';
+  var fname='photo_'+Date.now()+ext;
+  gasPost({
+    action:'uploadPhoto',
+    folderId:folderId,
+    fileName:fname,
+    mimeType:mime,
+    base64:b64
+  },function(err,res){
+    if(err||!res||!res.url){
+      console.warn('写真アップロード失敗',err);
+      cb(null, base64data); // フォールバック：base64のまま保持
+      return;
+    }
+    cb(null, res.url);
+  });
+}
+
+// ============================================================
+// 全データ読み込み（初回）
+// ============================================================
+function loadAll(){
+  showLoading('データを読み込んでいます...');
+  gasGet({action:'getAll'},function(err,data){
+    hideLoading();
+    if(err||!data||data.error){
+      console.warn('GAS接続失敗、ローカルデータで続行',err);
+      GAS_LOADED=false;
+      applyStyle();
+      renderNameScreen();
+      if(err) toast('⚠ オフラインモード（データは保存されません）');
+      return;
+    }
+    // データを上書き（存在する場合のみ）
+    if(data.cfg) Object.assign(cfg, data.cfg);
+    if(data.members&&data.members.length) members=data.members;
+    if(data.sites&&data.sites.length) sites=data.sites;
+    if(data.TM&&data.TM.length) TM=data.TM;
+    if(data.items) items=data.items;
+    if(data.hist) hist=data.hist;
+    if(data.repairs) repairs=data.repairs;
+    GAS_LOADED=true;
+    applyStyle();
+    renderNameScreen();
+    toast('✅ データを読み込みました');
+  });
+}
+
+// ============================================================
+// 全データ保存（操作後に呼ぶ）
+// ============================================================
+function saveAll(cb){
+  if(!GAS_LOADED) { if(cb)cb(); return; } // オフライン時はスキップ
+  showLoading('保存中...');
+  // 写真(base64)はスプレッドシートに保存しない（URLのみ保存）
+  gasPost({
+    action:'saveAll',
+    data:{
+      cfg:cfg,
+      members:members,
+      sites:sites,
+      TM:TM.map(function(t){return Object.assign({},t,{photo:isPhoto(t.photo)?'':t.photo});}),
+      items:items.map(function(x){return Object.assign({},x,{photo:isPhoto(x.photo)?'':x.photo});}),
+      hist:hist,
+      repairs:repairs.map(function(r){return Object.assign({},r,{photo:isPhoto(r.photo)?'':r.photo});})
+    }
+  },function(err,res){
+    hideLoading();
+    if(err||!res||res.status!=='ok'){
+      console.warn('保存失敗',err,res);
+      toast('⚠ 保存に失敗しました（通信エラー）');
+    }
+    if(cb)cb();
+  });
+}
+
+// ============================================================
+// 持出し・返却の差分送信（リアルタイム記録用）
+// ============================================================
+function gasAdjust(histEntry, itemAfterQty, cb){
+  if(!GAS_LOADED){if(cb)cb();return;}
+  gasPost({
+    action:'adjust',
+    hist:histEntry,
+    itemId:histEntry.iid,
+    qty:itemAfterQty
+  },function(err,res){
+    if(err||!res||res.status!=='ok'){
+      // 失敗してもUX止めないが、saveAllでリカバリ
+      console.warn('adjust送信失敗、saveAllでリカバリ');
+      saveAll(cb);
+      return;
+    }
+    if(cb)cb();
+  });
 }
 
 // ============================================================
 // 初期化
 // ============================================================
-
-// ============================================================
-// GAS接続
-// ============================================================
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbwg2BNYmtpKs9fZOa_67buahbG4Yd_hB4EZ0gW2M9CFs_1cfIC-LU_hLIp6Xg8lgmS9/exec';
-var _saving = false;
-
-
-async function uploadPhotoToGAS(base64, action, callback) {
-  try {
-    toast('📷 写真をアップロード中...');
-    // 写真を圧縮してから送る
-    var compressed = await compressBase64(base64, 400, 0.6);
-    var res = await gasPost({ action: action, base64: compressed, filename: 'photo_' + Date.now() + '.jpg' });
-    if (res.ok && res.data && res.data.url) {
-      callback(res.data.url);
-      toast('📷 写真を保存しました');
-    } else {
-      toast('写真のアップロードに失敗しました');
-      console.error(res);
-    }
-  } catch(e) {
-    toast('写真のアップロードに失敗しました');
-    console.error(e);
-  }
-}
-
-function compressBase64(base64, maxWidth, quality) {
-  return new Promise(function(resolve) {
-    var img = new Image();
-    img.onload = function() {
-      var canvas = document.createElement('canvas');
-      var w = img.width, h = img.height;
-      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.src = base64;
-  });
-}
-async function gasGet(action) {
-  const r = await fetch(GAS_URL + '?action=' + action);
-  return r.json();
-}
-async function gasPost(body) {
-  const r = await fetch(GAS_URL, {
-    method: 'POST',
-    body: JSON.stringify(body)
-  });
-  return r.json();
-}
-
-async function loadFromGAS() {
-  try {
-    const res = await gasGet('getAll');
-    if (!res.ok) { console.error(res.error); return; }
-    const d = res.data;
-    if (d.members && d.members.length) members = d.members.map(function(m){ m.name=String(m.name||''); m.id=String(m.id||''); return m; });
-    if (d.sites   && d.sites.length)   sites   = d.sites.map(function(s){ s.name=String(s.name||''); s.id=String(s.id||''); s.chief=String(s.chief||''); s.leaders=(s.leaders||[]).map(function(l){return String(l||'');}); s.tools=s.tools||[]; return s; });
-    if (d.TM      && d.TM.length)      TM      = d.TM.map(function(t){ t.name=String(t.name||''); t.id=String(t.id||''); t.yomis=t.yomis||[]; t.unit=String(t.unit||''); t.total=Number(t.total)||0; t.photo=String(t.photo||''); t.cat=String(t.cat||'工具'); return t; });
-    if (d.items)                        items   = d.items.map(function(x){ x.name=String(x.name||''); x.id=String(x.id||''); x.unit=String(x.unit||''); x.photo=String(x.photo||''); x.note=String(x.note||''); x.ref=String(x.ref||''); return x; });
-    if (d.hist)                         hist    = d.hist;
-    if (d.repairs)                      repairs = d.repairs.map(function(r){ r.toolName=String(r.toolName||''); r.siteName=String(r.siteName||''); r.issue=String(r.issue||''); r.photo=String(r.photo||''); r.user=String(r.user||''); return r; });
-    if (d.cfg)                          cfg     = d.cfg;
-  } catch(e) {
-    console.error('GAS接続エラー:', e);
-  }
-}
-
-async function saveToGAS() {
-  if (_saving) return;
-  _saving = true;
-  try {
-    await gasPost({ action: 'saveAll', data: { members, sites, TM, items, hist, repairs, cfg } });
-  } finally {
-    _saving = false;
-  }
-}
-
-
-(async () => {
-  await loadFromGAS();
-  applyStyle();
-  renderNameScreen();
-})();
+applyStyle();
+loadAll();
 </script>
 </body>
 </html>
