@@ -1528,14 +1528,40 @@ function handleTMPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
   r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){
-  window._tmePhotoData=cropped;
-  if(GAS_LOADED && cropped && cropped.indexOf('data:')===0){
-    uploadPhoto('1PbgWvVE9AlGmtqdv77gOTqBuC7C4yRkd', cropped, function(err, url){
-      if(url && url.indexOf('http')===0){ window._tmePhotoData=url; }
-    });
-  }
-});};
+    window._tmePhotoData=cropped;
+    window._tmePhotoReady=false;
+    if(GAS_LOADED&&cropped&&cropped.indexOf('data:')===0){
+      uploadPhoto('1PbgWvVE9AlGmtqdv77gOTqBuC7C4yRkd',cropped,function(err,url){
+        if(url&&url.indexOf('http')===0){window._tmePhotoData=url;}
+        window._tmePhotoReady=true;
+      });
+    }else{window._tmePhotoReady=true;}
+  });};
   r.readAsDataURL(f);
+}
+function saveTMEdit(el){
+  var id=el.dataset.tmid, t=findTM(id); if(!t)return;
+  var name=document.getElementById('tme-name').value.trim();
+  if(!name){toast('工具名を入力してください');return;}
+  var oldName=t.name;
+  var yomiChks=document.querySelectorAll('.kana-btn.active[data-k]');
+  var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
+  if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
+  var newCat=document.getElementById('tme-cat').value||'工具';
+  var newPhoto=window._tmePhotoData||t.photo||'';
+  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
+  items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
+  toast('更新しました'); renderTMModal();
+  var _sid=id;
+  function doSave(){
+    var _t=findTM(_sid);
+    if(_t){_t.photo=window._tmePhotoData||_t.photo;items.forEach(function(x){if(x.ref===_sid)x.photo=_t.photo;});}
+    window._tmePhotoData='';
+    saveAll(null);
+  }
+  if(window._tmePhotoReady===false){
+    var _chk=setInterval(function(){if(window._tmePhotoReady!==false){clearInterval(_chk);doSave();}},500);
+  }else{doSave();}
 }
 function saveTMEdit(el){
   var id=el.dataset.tmid, t=findTM(id); if(!t)return;
