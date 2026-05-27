@@ -1874,36 +1874,42 @@ function uploadPhoto(folderId, base64data, cb){
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  // no-corsでPOST送信（リダイレクト問題を回避）
-  // レスポンスは読めないので、送信後にGASからURLをポーリングする代わりに
-  // Drive thumbnail URLを予測して返す方式を使う
-  var payload = JSON.stringify({
-    action:'uploadPhoto',
-    folderId:folderId,
-    fileName:fname,
-    mimeType:mime,
-    base64:b64
-  });
-  // まずno-corsで試みる
-  fetch(GAS_URL,{
-    method:'POST',
-    mode:'no-cors',
-    body:payload
-  })
-  .then(function(){
-    // no-corsではレスポンスが読めないため
-    // GETで結果を取得する（ファイル名をキーに検索）
-    return fetch(GAS_URL+'?action=getPhotoUrl&folderId='+encodeURIComponent(folderId)+'&fileName='+encodeURIComponent(fname),{redirect:'follow'});
-  })
-  .then(function(r){return r.json();})
-  .then(function(d){
-    if(d&&d.url){cb(null,d.url);}
-    else{cb(null,base64data);}
-  })
-  .catch(function(e){
-    console.warn('写真アップロード失敗',e);
-    cb(null,base64data);
-  });
+  // base64を小さいチャンクに分けてGETで順番に送信
+  var CHUNK=1500;
+  var chunks=[];
+  for(var i=0;i<b64.length;i+=CHUNK) chunks.push(b64.slice(i,i+CHUNK));
+  var total=chunks.length;
+  function sendChunk(idx){
+    if(idx>=total){
+      // 全チャンク送信完了 → URLを取得
+      setTimeout(function(){
+        fetch(GAS_URL+'?action=getPhotoUrl&folderId='+encodeURIComponent(folderId)+'&fileName='+encodeURIComponent(fname),{redirect:'follow'})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d&&d.url){cb(null,d.url);}
+          else{cb(null,base64data);}
+        })
+        .catch(function(){cb(null,base64data);});
+      },2000);
+      return;
+    }
+    var url=GAS_URL+'?action=uploadChunk'
+      +'&folderId='+encodeURIComponent(folderId)
+      +'&fileName='+encodeURIComponent(fname)
+      +'&mimeType='+encodeURIComponent(mime)
+      +'&chunk='+encodeURIComponent(chunks[idx])
+      +'&idx='+idx
+      +'&total='+total;
+    fetch(url,{redirect:'follow'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&d.status==='ok'){sendChunk(idx+1);}
+      else{cb(null,base64data);}
+    })
+    .catch(function(){cb(null,base64data);});
+  }
+  toast('📷 写真をアップロード中...');
+  sendChunk(0);
 }
 
 // ============================================================
