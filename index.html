@@ -1779,7 +1779,7 @@ function cropApply(){
   if(!img||!vp){closeCropModal();return;}
   var vw=vp.offsetWidth, vh=vp.offsetHeight;
   var canvas=document.createElement('canvas');
-  var OUT_W=800, OUT_H=Math.round(800*vh/vw);
+  var OUT_W=600, OUT_H=Math.round(600*vh/vw);
   canvas.width=OUT_W;canvas.height=OUT_H;
   var ctx=canvas.getContext('2d');
   ctx.imageSmoothingEnabled=true;
@@ -1789,7 +1789,7 @@ function cropApply(){
   var sx=-_cropX/_cropScale, sy=-_cropY/_cropScale;
   var sw=vw/_cropScale, sh=vh/_cropScale;
   ctx.drawImage(img,sx,sy,sw,sh,0,0,OUT_W,OUT_H);
-  var dataUrl=canvas.toDataURL('image/jpeg',0.92);
+  var dataUrl=canvas.toDataURL('image/jpeg',0.75);  // 0.92→0.75に圧縮
   // まずUIに反映（base64）
   var target=document.getElementById(_cropTargetId);
   if(target)target.innerHTML='<img src="'+dataUrl+'" alt="">';
@@ -1846,9 +1846,11 @@ function gasGet(params, cb){
 
 // GAS POSTリクエスト
 function gasPost(body, cb){
+  // GASはContent-Type:application/jsonでプリフライトが起きるため
+  // text/plainで送ってGAS側でJSONパースする
   fetch(GAS_URL,{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{'Content-Type':'text/plain'},
     body:JSON.stringify(body)
   })
   .then(function(r){return r.json();})
