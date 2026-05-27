@@ -1847,14 +1847,17 @@ function gasGet(params, cb){
 
 // GAS POSTリクエスト
 function gasPost(body, cb){
+  // GASのPOSTは302リダイレクトになるがno-corsで送信は成功する
   fetch(GAS_URL,{
     method:'POST',
-    redirect:'follow',
+    mode:'no-cors',
     headers:{'Content-Type':'text/plain'},
     body:JSON.stringify(body)
   })
-  .then(function(r){return r.json();})
-  .then(function(d){cb(null,d);})
+  .then(function(){
+    // no-corsではレスポンスボディが読めないため楽観的にokを返す
+    cb(null, {status:'ok'});
+  })
   .catch(function(e){cb(e,null);});
 }
 
@@ -1866,26 +1869,27 @@ function gasPost(body, cb){
 // cb(err, url) : DriveのURL or null
 function uploadPhoto(folderId, base64data, cb){
   if(!base64data||base64data.indexOf('data:')<0){cb(null,'');return;}
-  // data:image/jpeg;base64,XXX → base64部分だけ取る
   var parts=base64data.split(',');
   var mime=parts[0].replace('data:','').replace(';base64','');
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  gasPost({
-    action:'uploadPhoto',
-    folderId:folderId,
-    fileName:fname,
-    mimeType:mime,
-    base64:b64
-  },function(err,res){
-    if(err||!res||!res.url){
-      console.warn('写真アップロード失敗',err);
-      cb(null, base64data); // フォールバック：base64のまま保持
-      return;
-    }
-    cb(null, res.url);
-  });
+  // GETパラメータで送る（POSTのリダイレクト問題を回避）
+  var url=GAS_URL+'?action=uploadPhoto'
+    +'&folderId='+encodeURIComponent(folderId)
+    +'&fileName='+encodeURIComponent(fname)
+    +'&mimeType='+encodeURIComponent(mime)
+    +'&base64='+encodeURIComponent(b64);
+  fetch(url,{redirect:'follow'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d||!d.url){cb(null,base64data);return;}
+      cb(null,d.url);
+    })
+    .catch(function(e){
+      console.warn('写真アップロード失敗',e);
+      cb(null,base64data);
+    });
 }
 
 // ============================================================
