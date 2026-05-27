@@ -744,7 +744,10 @@ function triggerRepairPhoto(){var e=document.getElementById('repair-photo-inp');
 function handleRepairPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'repair-photo-area',function(cropped){_repairPhoto=cropped;});};
+  r.onload=function(ev){openCropModal(ev.target.result,'repair-photo-area',function(cropped){
+    _repairPhoto=cropped;
+    uploadPhotoToGAS(cropped,'uploadRepairPhoto',function(url){_repairPhoto=url;var pa=document.getElementById('repair-photo-area');if(pa)pa.innerHTML='<img src="'+url+'" alt="">';});
+  });};
   r.readAsDataURL(f);
 }
 function deleteRepairConfirm(rid,name){
@@ -995,7 +998,10 @@ function triggerPhoto(){var e=document.getElementById('photo-inp');if(e)e.click(
 function handlePhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'photo-area',function(cropped){photoData=cropped;});};
+  r.onload=function(ev){openCropModal(ev.target.result,'photo-area',function(cropped){
+    photoData=cropped;
+    uploadPhotoToGAS(cropped,'uploadToolPhoto',function(url){photoData=url;var pa=document.getElementById('photo-area');if(pa)pa.innerHTML='<img src="'+url+'" alt="">';});
+  });};
   r.readAsDataURL(f);
 }
 function saveItem(){
@@ -1510,7 +1516,10 @@ function triggerTMPhoto(){var e=document.getElementById('tme-photo-inp');if(e)e.
 function handleTMPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){window._tmePhotoData=cropped;});};
+  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){
+    window._tmePhotoData=cropped;
+    uploadPhotoToGAS(cropped,'uploadToolPhoto',function(url){window._tmePhotoData=url;var pa=document.getElementById('tme-photo-area');if(pa)pa.innerHTML='<img src="'+url+'" alt="">';});
+  });};
   r.readAsDataURL(f);
 }
 function saveTMEdit(el){
@@ -1788,6 +1797,22 @@ function cropApply(){
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbwg2BNYmtpKs9fZOa_67buahbG4Yd_hB4EZ0gW2M9CFs_1cfIC-LU_hLIp6Xg8lgmS9/exec';
 var _saving = false;
 
+
+async function uploadPhotoToGAS(base64, action, callback) {
+  try {
+    toast('📷 写真をアップロード中...');
+    var res = await gasPost({ action: action, base64: base64, filename: 'photo_' + Date.now() + '.jpg' });
+    if (res.ok && res.data && res.data.url) {
+      callback(res.data.url);
+      toast('📷 写真を保存しました');
+    } else {
+      toast('写真のアップロードに失敗しました');
+    }
+  } catch(e) {
+    toast('写真のアップロードに失敗しました');
+    console.error(e);
+  }
+}
 async function gasGet(action) {
   const r = await fetch(GAS_URL + '?action=' + action);
   return r.json();
