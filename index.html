@@ -1542,12 +1542,15 @@ function saveTMEdit(el){
   var name=document.getElementById('tme-name').value.trim();
   if(!name){toast('工具名を入力してください');return;}
   var oldName=t.name;
+  var yomiChks=document.querySelectorAll('.kana-btn.active[data-k]');
+  var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
+  if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   var newCat=document.getElementById('tme-cat').value||'工具';
-    var newPhoto=window._tmePhotoData||t.photo||'';
-  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=window._tmePhotoData||t.photo||'';
-    items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=window._tmePhotoData||x.photo;}});
-    toast('更新しました'); window._tmePhotoData=''; renderTMModal();
-    setTimeout(function(){ saveAll(null); }, 8000);
+  var newPhoto=window._tmePhotoData||t.photo||'';
+  t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
+  items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
+  toast('更新しました'); window._tmePhotoData=''; renderTMModal();
+  setTimeout(function(){ saveAll(null); }, 8000);
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
 function openAddTM(){
