@@ -1828,28 +1828,8 @@ function cropApply(){
   var target=document.getElementById(_cropTargetId);
   if(target)target.innerHTML='<img src="'+dataUrl+'" alt="">';
   closeCropModal();
-  // folderId判定：修理写真か工具写真か
-  var folderId = (_cropTargetId==='repair-photo-area')
-    ? '1PL5JGdGksKFf6QPKmcmOz2XFL7iZiCYH'   // 修理写真フォルダ
-    : '1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk';   // 工具写真フォルダ
-  // GASへアップロード（バックグラウンド）
-  if(GAS_LOADED){
-    toast('📷 写真をアップロード中...');
-    uploadPhoto(folderId, dataUrl, function(err, url){
-      if(url && url!==dataUrl){
-        // URLが返ってきたらコールバックにURLを渡す
-        if(_cropCallback) _cropCallback(url);
-        // UIの画像はそのまま（base64表示を維持）
-        toast('✅ 写真を保存しました');
-      } else {
-        // フォールバック: base64のままコールバック
-        if(_cropCallback) _cropCallback(dataUrl);
-      }
-    });
-  } else {
-    // オフライン時はbase64のまま
-    if(_cropCallback) _cropCallback(dataUrl);
-  }
+  // コールバックにbase64を渡す（各呼び出し元でDriveアップロードを担当する）
+  if(_cropCallback) _cropCallback(dataUrl);
 }
 
 // ============================================================
@@ -1897,9 +1877,6 @@ function gasPost(body, cb){
 // ============================================================
 // 写真アップロード（base64 → Google Drive → URL返却）
 // ============================================================
-// folderId: 'tool' か 'repair'
-// base64data: 'data:image/jpeg;base64,...'
-// cb(err, url) : DriveのURL or null
 function uploadPhoto(folderId, base64data, cb){
   if(!base64data||base64data.indexOf('data:')<0){cb(null,'');return;}
   var parts=base64data.split(',');
@@ -1907,42 +1884,35 @@ function uploadPhoto(folderId, base64data, cb){
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  // base64を小さいチャンクに分けてGETで順番に送信
-  var CHUNK=1500;
-  var chunks=[];
-  for(var i=0;i<b64.length;i+=CHUNK) chunks.push(b64.slice(i,i+CHUNK));
-  var total=chunks.length;
-  function sendChunk(idx){
-    if(idx>=total){
-      // 全チャンク送信完了 → URLを取得
-      setTimeout(function(){
-        fetch(GAS_URL+'?action=getPhotoUrl&folderId='+encodeURIComponent(folderId)+'&fileName='+encodeURIComponent(fname),{redirect:'follow'})
-        .then(function(r){return r.json();})
-        .then(function(d){
-          if(d&&d.url){cb(null,d.url);}
-          else{cb(null,base64data);}
-        })
-        .catch(function(){cb(null,base64data);});
-      },2000);
-      return;
-    }
-    var url=GAS_URL+'?action=uploadChunk'
-      +'&folderId='+encodeURIComponent(folderId)
-      +'&fileName='+encodeURIComponent(fname)
-      +'&mimeType='+encodeURIComponent(mime)
-      +'&chunk='+encodeURIComponent(chunks[idx])
-      +'&idx='+idx
-      +'&total='+total;
-    fetch(url,{redirect:'follow'})
-    .then(function(r){return r.json();})
-    .then(function(d){
-      if(d&&d.status==='ok'){sendChunk(idx+1);}
-      else{cb(null,base64data);}
-    })
-    .catch(function(){cb(null,base64data);});
-  }
   toast('📷 写真をアップロード中...');
-  sendChunk(0);
+  // POSTで一括送信（GASのdoPostでuploadPhotoアクションを処理）
+  fetch(GAS_URL, {
+    method: 'POST',
+    mode: 'cors',
+    headers: {'Content-Type': 'text/plain'},
+    body: JSON.stringify({
+      action: 'uploadPhoto',
+      folderId: folderId,
+      fileName: fname,
+      mimeType: mime,
+      data: b64
+    }),
+    redirect: 'follow'
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    if(d && d.url){
+      toast('✅ 写真を保存しました');
+      cb(null, d.url);
+    } else {
+      console.warn('uploadPhoto: URLなし', d);
+      cb(null, base64data);
+    }
+  })
+  .catch(function(e){
+    console.warn('uploadPhoto失敗', e);
+    cb(null, base64data);
+  });
 }
 
 // ============================================================
