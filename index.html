@@ -184,7 +184,7 @@ input,select{font-family:inherit}
         <div class="av" id="hdr-av" style="color:#1a56db">?</div>
         <span id="hdr-uname">---</span>
       </div>
-      <span style="font-size:9px;opacity:0.75">タップしてログアウト</span>
+      <span style="font-size:9px;opacity:">タップしてログアウト</span>
     </button>
   </div>
   <div class="main-body">
@@ -1552,7 +1552,7 @@ function saveTMEdit(el){
   t.unit=document.getElementById('tme-unit').value||'個';
   t.total=parseInt(document.getElementById('tme-total').value)||0;
   items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;}});
-  toast('更新しました'); renderTMModal();
+  toast('更新しました');
   var _sid=id;
   function doSave(){
     var _t=findTM(_sid);
@@ -1565,7 +1565,7 @@ function saveTMEdit(el){
     }
     window._tmePhotoData='';
     window._tmePhotoReady=undefined;
-    saveAll(function(){ openToolMasterModal(); });
+    saveAll(function(){ toast('📷 写真も保存しました'); openToolMasterModal(); });
   }
   if(window._tmePhotoReady===false||window._tmePhotoReady===undefined){
     var _chk=setInterval(function(){
@@ -1820,7 +1820,7 @@ function cropApply(){
   var sx=-_cropX/_cropScale, sy=-_cropY/_cropScale;
   var sw=vw/_cropScale, sh=vh/_cropScale;
   ctx.drawImage(img,sx,sy,sw,sh,0,0,OUT_W,OUT_H);
-  var dataUrl=canvas.toDataURL('image/jpeg',0.75);  // 0.92→0.75に圧縮
+  var dataUrl=canvas.toDataURL('image/jpeg',0.5);  // 0.92→に圧縮
   // まずUIに反映（base64）
   var target=document.getElementById(_cropTargetId);
   if(target)target.innerHTML='<img src="'+dataUrl+'" alt="">';
