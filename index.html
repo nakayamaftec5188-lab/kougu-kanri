@@ -758,7 +758,16 @@ function triggerRepairPhoto(){var e=document.getElementById('repair-photo-inp');
 function handleRepairPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'repair-photo-area',function(cropped){_repairPhoto=cropped;});};
+  r.onload=function(ev){
+    openCropModal(ev.target.result,'repair-photo-area',function(cropped){
+      _repairPhoto=cropped;
+      if(GAS_LOADED){
+        uploadPhoto('1PL5JGdGksKFf6QPKmcmOz2XFL7iZiCYH', cropped, function(err, url){
+          if(url && url.indexOf('http')===0){ _repairPhoto=url; }
+        });
+      }
+    });
+  };
   r.readAsDataURL(f);
 }
 function deleteRepairConfirm(rid,name){
@@ -1009,7 +1018,16 @@ function triggerPhoto(){var e=document.getElementById('photo-inp');if(e)e.click(
 function handlePhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'photo-area',function(cropped){photoData=cropped;});};
+  r.onload=function(ev){
+    openCropModal(ev.target.result,'photo-area',function(cropped){
+      photoData=cropped;
+      if(GAS_LOADED){
+        uploadPhoto('1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk', cropped, function(err, url){
+          if(url && url.indexOf('http')===0){ photoData=url; }
+        });
+      }
+    });
+  };
   r.readAsDataURL(f);
 }
 function saveItem(){
@@ -1025,6 +1043,7 @@ function saveItem(){
   if(!chks.length){toast('現場を1つ以上選択してください');return;}
   var checkedSiteIds={};
   chks.forEach(function(c){checkedSiteIds[c.value]=true;});
+  var safePhoto = (photoData && photoData.indexOf('data:')===0) ? '' : (photoData||'');
   if(editId){
     var item=findItem(editId);
     var siblings=items.filter(function(x){return x.name===item.name&&x.cat===item.cat;});
@@ -1033,9 +1052,9 @@ function saveItem(){
     Object.keys(checkedSiteIds).forEach(function(sid){
       if(sibMap[sid]){
         var idx=items.findIndex(function(x){return x.id===sibMap[sid].id;});
-        if(idx>=0)items[idx]=Object.assign({},sibMap[sid],{name:name,cat:cat,unit:unit,total:total,mach:mach,note:note,photo:photoData||sibMap[sid].photo});
+        if(idx>=0)items[idx]=Object.assign({},sibMap[sid],{name:name,cat:cat,unit:unit,total:total,mach:mach,note:note,photo:safePhoto||sibMap[sid].photo});
       } else {
-        items.push({id:mkId(),name:name,cat:cat,site:sid,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:photoData||''});
+        items.push({id:mkId(),name:name,cat:cat,site:sid,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:safePhoto||''});
       }
     });
     Object.keys(sibMap).forEach(function(sid){
@@ -1045,7 +1064,7 @@ function saveItem(){
   } else {
     var added=0;
     chks.forEach(function(chk){
-      items.push({id:mkId(),name:name,cat:cat,site:chk.value,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:photoData||''});
+      items.push({id:mkId(),name:name,cat:cat,site:chk.value,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:safePhoto||''});
       added++;
     });
     toast('📦 '+name+' を '+added+'箇所に追加しました');
@@ -1894,7 +1913,7 @@ function uploadPhoto(folderId, base64data, cb){
       folderId: folderId,
       fileName: fname,
       mimeType: mime,
-      data: b64
+      base64: b64
     }),
     redirect: 'follow'
   })
