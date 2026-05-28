@@ -1531,10 +1531,11 @@ function handleTMPhoto(e){
     window._tmePhotoData=cropped;
     window._tmePhotoReady=false;
     if(GAS_LOADED&&cropped&&cropped.indexOf('data:')===0){
+      var _tmIdForUpload=document.querySelector('[data-tmid]')?document.querySelector('[data-tmid]').dataset.tmid:'';
       uploadPhoto('1PbgWvVE9AlGmtqdv77gOTqBuC7C4yRkd',cropped,function(err,url){
         if(url&&url.indexOf('http')===0){window._tmePhotoData=url;}
         window._tmePhotoReady=true;
-      });
+      },'tmId='+_tmIdForUpload);
     }else{window._tmePhotoReady=true;}
   });};
   r.readAsDataURL(f);
@@ -1897,21 +1898,19 @@ function gasPost(body, cb){
 // folderId: 'tool' か 'repair'
 // base64data: 'data:image/jpeg;base64,...'
 // cb(err, url) : DriveのURL or null
-function uploadPhoto(folderId, base64data, cb){
+function uploadPhoto(folderId, base64data, cb, extraId){
   if(!base64data||base64data.indexOf('data:')<0){cb(null,'');return;}
   var parts=base64data.split(',');
   var mime=parts[0].replace('data:','').replace(';base64','');
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  // base64を小さいチャンクに分けてGETで順番に送信
   var CHUNK=1500;
   var chunks=[];
   for(var i=0;i<b64.length;i+=CHUNK) chunks.push(b64.slice(i,i+CHUNK));
   var total=chunks.length;
   function sendChunk(idx){
     if(idx>=total){
-      // 全チャンク送信完了 → URLを取得
       setTimeout(function(){
         fetch(GAS_URL+'?action=getPhotoUrl&folderId='+encodeURIComponent(folderId)+'&fileName='+encodeURIComponent(fname),{redirect:'follow'})
         .then(function(r){return r.json();})
@@ -1929,7 +1928,8 @@ function uploadPhoto(folderId, base64data, cb){
       +'&mimeType='+encodeURIComponent(mime)
       +'&chunk='+encodeURIComponent(chunks[idx])
       +'&idx='+idx
-      +'&total='+total;
+      +'&total='+total
+      +(extraId?'&'+extraId:'');
     fetch(url,{redirect:'follow'})
     .then(function(r){return r.json();})
     .then(function(d){
