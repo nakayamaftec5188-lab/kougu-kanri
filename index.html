@@ -1905,7 +1905,7 @@ function uploadPhoto(folderId, base64data, cb, extraId){
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  var CHUNK=1500;
+  var CHUNK=3000;
   var chunks=[];
   for(var i=0;i<b64.length;i+=CHUNK) chunks.push(b64.slice(i,i+CHUNK));
   var total=chunks.length;
