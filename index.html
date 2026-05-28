@@ -1516,6 +1516,7 @@ function openTMEdit(el){
   h+='<label class="lbl">総数</label><input id="tme-total" class="inp" type="number" value="'+t.total+'" min="0">';
   h+='<div class="modal-actions"><button class="btn-danger" data-tmid="'+id+'" onclick="deleteTMFromBtn(this)">削除</button><button class="btn-cancel" onclick="renderTMModal()">戻る</button><button class="btn-primary" data-tmid="'+id+'" onclick="saveTMEdit(this)">保存</button></div>';
   window._tmePhotoData=photo;
+  _tmeEditingId=id;
   showModal(h);
 }
 function toggleTMYomi(el){
@@ -1526,10 +1527,35 @@ function toggleTMYomi(el){
   el.style.borderColor=on?'#1a56db':'';
 }
 function triggerTMPhoto(){var e=document.getElementById('tme-photo-inp');if(e)e.click();}
+// 現在編集中のTM id（写真アップ完了後に自動更新するため保持）
+var _tmeEditingId='';
 function handleTMPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){window._tmePhotoData=cropped;});};
+  r.onload=function(ev){
+    openCropModal(ev.target.result,'tme-photo-area',function(cropped){
+      // まずbase64をセット（UIに即反映）
+      window._tmePhotoData=cropped;
+      // バックグラウンドでDriveにアップロード
+      if(GAS_LOADED){
+        uploadPhoto('1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk', cropped, function(err, url){
+          if(url && url.indexOf('http')===0){
+            window._tmePhotoData=url;
+            // TM配列のデータも即更新（保存ボタン前にURLが確定）
+            var tid=_tmeEditingId;
+            if(tid){
+              var tm=findTM(tid);
+              if(tm){
+                tm.photo=url;
+                items.forEach(function(x){if(x.ref===tid)x.photo=url;});
+                saveTMOnly(); // URLでバックグラウンド保存
+              }
+            }
+          }
+        });
+      }
+    });
+  };
   r.readAsDataURL(f);
 }
 function saveTMEdit(el){
@@ -1539,7 +1565,9 @@ function saveTMEdit(el){
   var yomiChks=document.querySelectorAll('.kana-btn.active[data-k]');var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   var newCat=document.getElementById('tme-cat').value||'工具';
-  var newPhoto=window._tmePhotoData||t.photo||'';
+  // _tmePhotoDataはDriveアップ完了後にURLに更新済み（base64の場合はまだアップ中→既存写真を維持）
+  var rawPhoto=window._tmePhotoData||t.photo||'';
+  var newPhoto=(rawPhoto.indexOf('data:')===0)?t.photo||'':rawPhoto;
   t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
   items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
   toast('✅ 更新しました'); window._tmePhotoData='';
