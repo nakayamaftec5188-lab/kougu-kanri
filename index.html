@@ -1567,10 +1567,11 @@ function saveTMEdit(el){
     window._tmePhotoReady=undefined;
     saveAll(null);
   }
-  if(window._tmePhotoReady===false){
+  if(window._tmePhotoReady===false||window._tmePhotoReady===undefined){
     var _chk=setInterval(function(){
-      if(window._tmePhotoReady!==false){clearInterval(_chk);doSave();}
+      if(window._tmePhotoReady===true){clearInterval(_chk);doSave();}
     },500);
+    setTimeout(function(){clearInterval(_chk);doSave();},30000);
   }else{doSave();}
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
