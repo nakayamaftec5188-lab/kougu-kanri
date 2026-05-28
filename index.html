@@ -1565,7 +1565,7 @@ function saveTMEdit(el){
     }
     window._tmePhotoData='';
     window._tmePhotoReady=undefined;
-    saveAll(function(){ renderTMModal(); });
+    saveAll(function(){ openToolMasterModal(); });
   }
   if(window._tmePhotoReady===false||window._tmePhotoReady===undefined){
     var _chk=setInterval(function(){
