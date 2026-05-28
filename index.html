@@ -1885,10 +1885,9 @@ function uploadPhoto(folderId, base64data, cb){
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
   toast('📷 写真をアップロード中...');
-  // POSTで一括送信（GASのdoPostでuploadPhotoアクションを処理）
+  // GASはCORSヘッダーを返さないためcredentials不要のfetchで送信
   fetch(GAS_URL, {
     method: 'POST',
-    mode: 'cors',
     headers: {'Content-Type': 'text/plain'},
     body: JSON.stringify({
       action: 'uploadPhoto',
@@ -1899,13 +1898,15 @@ function uploadPhoto(folderId, base64data, cb){
     }),
     redirect: 'follow'
   })
-  .then(function(r){return r.json();})
-  .then(function(d){
+  .then(function(r){return r.text();})
+  .then(function(txt){
+    var d;
+    try{ d=JSON.parse(txt); }catch(e){ d=null; }
     if(d && d.url){
       toast('✅ 写真を保存しました');
       cb(null, d.url);
     } else {
-      console.warn('uploadPhoto: URLなし', d);
+      console.warn('uploadPhoto: URLなし', txt);
       cb(null, base64data);
     }
   })
