@@ -1089,7 +1089,7 @@ function execDel(){
   if(delType==='item'){items=items.filter(function(x){return x.id!==delId;});editId=null;toast('品目を削除しました');closeModal();renderContent();saveItemsOnly();}
   else if(delType==='member'){var nm=members.find(function(x){return x.id===delId;});var n=nm?nm.name:'';members=members.filter(function(x){return x.id!==delId;});if(n)sites.forEach(function(s){if(s.chief===n)s.chief='';s.leaders=s.leaders.map(function(l){return l===n?'':l;});});toast('メンバーを削除しました');openMembersModal();saveAll(null);}
   else if(delType==='site'){var sid=delId;items=items.filter(function(x){return x.site!==sid;});sites=sites.filter(function(x){return x.id!==sid;});if(curSiteId===sid&&sites.length>0){curSiteId=sites[0].id;siteIdx=0;}toast('現場を削除しました');openSitesModal();saveItemsOnly();}
-  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('削除しました');openToolMasterModal();saveTMOnly();}
+  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('✅ 削除しました');closeModal();saveTMOnly();}
   delType=null;delId=null;
 }
 
@@ -1454,6 +1454,7 @@ function renderTMModal(){
   var activeRows={};
   kanas.forEach(function(k){var r=getKanaRow(k);if(r)activeRows[r]=true;});
   var disp=_tmKana?TM.filter(function(t){return (t.yomis||[t.yomi||'']).indexOf(_tmKana)>=0;}):TM;
+  // まず骨格だけ即表示（工具リストはプレースホルダー）
   var h='<div class="modal-title">🔧 工具管理（全体）</div><div class="modal-sub">全体の工具・写真・総数を管理します</div>';
   h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">';
   KANA_ROWS.forEach(function(r){
@@ -1475,21 +1476,22 @@ function renderTMModal(){
       h+='</div>';
     }
   }
-  h+='<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:14px;overflow:hidden;max-height:50vh;overflow-y:auto">';
-  if(!disp.length){h+='<div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px">該当する工具がありません</div>';}
-  disp.forEach(function(t){
-    var photo=t.photo||'';
-    var img=isPhoto(photo)?'<img src="'+photo+'" style="width:64px;height:42px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:11px">':'<div style="width:64px;height:42px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-right:11px">'+esc(photo||'🔧')+'</div>';
-    h+='<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9">'+img;
-    h+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1e293b">'+esc(t.name)+'</div>';
-    h+='<div style="font-size:11px;color:#64748b;margin-top:1px">総数 '+t.total+esc(t.unit)+'</div></div>';
-    h+='<button data-tmid="'+t.id+'" onclick="openTMEdit(this)" style="padding:6px 12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;flex-shrink:0">編集</button>';
-    h+='</div>';
-  });
-  h+='</div>';
+  h+='<div id="tm-list-wrap" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:14px;overflow:hidden;max-height:50vh;overflow-y:auto"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px">読み込み中...</div></div>';
   h+='<button class="btn-full" style="background:#1a56db;color:#fff" onclick="openAddTM()">＋ 新しい工具を追加</button>';
   h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">← 戻る</button></div>';
   showModal(h);
+  // 工具リストはrAFで非同期描画（モーダル表示後に行うためUIブロックなし）
+  requestAnimationFrame(function(){
+    var wrap=document.getElementById('tm-list-wrap');
+    if(!wrap)return;
+    if(!disp.length){wrap.innerHTML='<div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px">該当する工具がありません</div>';return;}
+    var rows=disp.map(function(t){
+      var photo=t.photo||'';
+      var img=isPhoto(photo)?'<img src="'+photo+'" style="width:64px;height:42px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:11px">':'<div style="width:64px;height:42px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-right:11px">'+esc(photo||'🔧')+'</div>';
+      return '<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9">'+img+'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1e293b">'+esc(t.name)+'</div><div style="font-size:11px;color:#64748b;margin-top:1px">総数 '+t.total+esc(t.unit)+'</div></div><button data-tmid="'+t.id+'" onclick="openTMEdit(this)" style="padding:6px 12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;flex-shrink:0">編集</button></div>';
+    });
+    wrap.innerHTML=rows.join('');
+  });
 }
 function clearTmKanaFilter(){_tmKana='';_tmKanaRow='';renderTMModal();}
 function setTmKanaRow(r){_tmKanaRow=r;_tmKana='';renderTMModal();}
@@ -1534,14 +1536,13 @@ function saveTMEdit(el){
   var id=el.dataset.tmid, t=findTM(id); if(!t)return;
   var name=document.getElementById('tme-name').value.trim();
   if(!name){toast('工具名を入力してください');return;}
-  var oldName=t.name;
   var yomiChks=document.querySelectorAll('.kana-btn.active[data-k]');var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   var newCat=document.getElementById('tme-cat').value||'工具';
   var newPhoto=window._tmePhotoData||t.photo||'';
   t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
   items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
-  toast('更新しました'); window._tmePhotoData=''; renderTMModal();
+  toast('✅ 更新しました'); window._tmePhotoData=''; closeModal();
   saveTMOnly();
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
@@ -1567,7 +1568,7 @@ function saveTM(){
   var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   TM.push({id:mkId(),name:name,cat:document.getElementById('tm-cat').value||'工具',yomis:yomisArr,yomi:yomisArr[0],unit:document.getElementById('tm-unit').value.trim()||'個',total:parseInt(document.getElementById('tm-total').value)||0,photo:''});
-  toast('追加しました：'+name); updateCnts(); renderTMModal();
+  toast('✅ 追加しました：'+name); updateCnts(); closeModal();
   saveTMOnly();
 }
 
