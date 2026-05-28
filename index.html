@@ -1565,7 +1565,7 @@ function saveTMEdit(el){
     }
     window._tmePhotoData='';
     window._tmePhotoReady=undefined;
-    saveAll(null);
+    saveAll(function(){ renderTMModal(); });
   }
   if(window._tmePhotoReady===false||window._tmePhotoReady===undefined){
     var _chk=setInterval(function(){
