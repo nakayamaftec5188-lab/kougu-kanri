@@ -1089,7 +1089,7 @@ function execDel(){
   if(delType==='item'){items=items.filter(function(x){return x.id!==delId;});editId=null;toast('品目を削除しました');closeModal();renderContent();saveItemsOnly();}
   else if(delType==='member'){var nm=members.find(function(x){return x.id===delId;});var n=nm?nm.name:'';members=members.filter(function(x){return x.id!==delId;});if(n)sites.forEach(function(s){if(s.chief===n)s.chief='';s.leaders=s.leaders.map(function(l){return l===n?'':l;});});toast('メンバーを削除しました');openMembersModal();saveAll(null);}
   else if(delType==='site'){var sid=delId;items=items.filter(function(x){return x.site!==sid;});sites=sites.filter(function(x){return x.id!==sid;});if(curSiteId===sid&&sites.length>0){curSiteId=sites[0].id;siteIdx=0;}toast('現場を削除しました');openSitesModal();saveItemsOnly();}
-  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('✅ 削除しました');closeModal();saveTMOnly();}
+  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('✅ 削除しました');openToolMasterModal();saveTMOnly();}
   delType=null;delId=null;
 }
 
@@ -1487,7 +1487,7 @@ function renderTMModal(){
     if(!disp.length){wrap.innerHTML='<div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px">該当する工具がありません</div>';return;}
     var rows=disp.map(function(t){
       var photo=t.photo||'';
-      var img=isPhoto(photo)?'<img src="'+photo+'" style="width:64px;height:42px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:11px">':'<div style="width:64px;height:42px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-right:11px">'+esc(photo||'🔧')+'</div>';
+      var img=isPhoto(photo)?'<img src="'+photo+'" loading="lazy" style="width:64px;height:42px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:11px">':'<div style="width:64px;height:42px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-right:11px">'+esc(photo||'🔧')+'</div>';
       return '<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9">'+img+'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1e293b">'+esc(t.name)+'</div><div style="font-size:11px;color:#64748b;margin-top:1px">総数 '+t.total+esc(t.unit)+'</div></div><button data-tmid="'+t.id+'" onclick="openTMEdit(this)" style="padding:6px 12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;flex-shrink:0">編集</button></div>';
     });
     wrap.innerHTML=rows.join('');
@@ -1542,7 +1542,8 @@ function saveTMEdit(el){
   var newPhoto=window._tmePhotoData||t.photo||'';
   t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
   items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
-  toast('✅ 更新しました'); window._tmePhotoData=''; closeModal();
+  toast('✅ 更新しました'); window._tmePhotoData='';
+  setTimeout(renderTMModal, 0);
   saveTMOnly();
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
@@ -1568,7 +1569,8 @@ function saveTM(){
   var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   TM.push({id:mkId(),name:name,cat:document.getElementById('tm-cat').value||'工具',yomis:yomisArr,yomi:yomisArr[0],unit:document.getElementById('tm-unit').value.trim()||'個',total:parseInt(document.getElementById('tm-total').value)||0,photo:''});
-  toast('✅ 追加しました：'+name); updateCnts(); closeModal();
+  toast('✅ 追加しました：'+name); updateCnts();
+  setTimeout(renderTMModal, 0);
   saveTMOnly();
 }
 
