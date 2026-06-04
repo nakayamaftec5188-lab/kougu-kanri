@@ -223,7 +223,7 @@ input,select{font-family:inherit}
 // ============================================================
 // GAS連携設定
 // ============================================================
-var GAS_URL = 'https://script.google.com/macros/s/AKfycbxiyBz-FQoXyyFFE33tNXRbRl_ETxsGW6Wfqrzo6QIu7KVPbElX94R3opcD51CH5NrMTQ/exec';
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbwzwwRA4s9S_5lUXQYLlzxRTxHFLZJ2mfCbJ4gVg9I26c02YaYgf2UScV3E_PeVvZRI/exec';
 var GAS_LOADED = false;  // 初回ロード完了フラグ
 
 var cfg = {title:'現場工具管理', color:'#1a56db', bg:''};
@@ -615,7 +615,7 @@ function execTransfer(){
   closeModal();
   toast('🚚 '+item.name+' '+_trQty+item.unit+' を'+toName+'へ移動しました');
   renderContent();
-  saveItemsOnly();
+  saveAll(null);
 }
 
 // ============================================================
@@ -758,16 +758,7 @@ function triggerRepairPhoto(){var e=document.getElementById('repair-photo-inp');
 function handleRepairPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){
-    openCropModal(ev.target.result,'repair-photo-area',function(cropped){
-      _repairPhoto=cropped;
-      if(GAS_LOADED){
-        uploadPhoto('1PL5JGdGksKFf6QPKmcmOz2XFL7iZiCYH', cropped, function(err, url){
-          if(url && url.indexOf('http')===0){ _repairPhoto=url; }
-        });
-      }
-    });
-  };
+  r.onload=function(ev){openCropModal(ev.target.result,'repair-photo-area',function(cropped){_repairPhoto=cropped;});};
   r.readAsDataURL(f);
 }
 function deleteRepairConfirm(rid,name){
@@ -839,7 +830,7 @@ function saveRepair(){
   }
   _repairEditId=null;_repairPhoto='';
   openRepairModal();
-  if(GAS_LOADED)gasPost({action:'saveAll',data:{repairs:repairs.map(function(r){var p=r.photo||'';return Object.assign({},r,{photo:p.indexOf('data:')===0?'':p});})}},function(){});
+  saveAll(null);
 }
 
 // ============================================================
@@ -1018,16 +1009,7 @@ function triggerPhoto(){var e=document.getElementById('photo-inp');if(e)e.click(
 function handlePhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){
-    openCropModal(ev.target.result,'photo-area',function(cropped){
-      photoData=cropped;
-      if(GAS_LOADED){
-        uploadPhoto('1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk', cropped, function(err, url){
-          if(url && url.indexOf('http')===0){ photoData=url; }
-        });
-      }
-    });
-  };
+  r.onload=function(ev){openCropModal(ev.target.result,'photo-area',function(cropped){photoData=cropped;});};
   r.readAsDataURL(f);
 }
 function saveItem(){
@@ -1043,7 +1025,6 @@ function saveItem(){
   if(!chks.length){toast('現場を1つ以上選択してください');return;}
   var checkedSiteIds={};
   chks.forEach(function(c){checkedSiteIds[c.value]=true;});
-  var safePhoto = (photoData && photoData.indexOf('data:')===0) ? '' : (photoData||'');
   if(editId){
     var item=findItem(editId);
     var siblings=items.filter(function(x){return x.name===item.name&&x.cat===item.cat;});
@@ -1052,9 +1033,9 @@ function saveItem(){
     Object.keys(checkedSiteIds).forEach(function(sid){
       if(sibMap[sid]){
         var idx=items.findIndex(function(x){return x.id===sibMap[sid].id;});
-        if(idx>=0)items[idx]=Object.assign({},sibMap[sid],{name:name,cat:cat,unit:unit,total:total,mach:mach,note:note,photo:safePhoto||sibMap[sid].photo});
+        if(idx>=0)items[idx]=Object.assign({},sibMap[sid],{name:name,cat:cat,unit:unit,total:total,mach:mach,note:note,photo:photoData||sibMap[sid].photo});
       } else {
-        items.push({id:mkId(),name:name,cat:cat,site:sid,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:safePhoto||''});
+        items.push({id:mkId(),name:name,cat:cat,site:sid,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:photoData||''});
       }
     });
     Object.keys(sibMap).forEach(function(sid){
@@ -1064,13 +1045,13 @@ function saveItem(){
   } else {
     var added=0;
     chks.forEach(function(chk){
-      items.push({id:mkId(),name:name,cat:cat,site:chk.value,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:safePhoto||''});
+      items.push({id:mkId(),name:name,cat:cat,site:chk.value,unit:unit,total:total,qty:qty,mach:mach,note:note,photo:photoData||''});
       added++;
     });
     toast('📦 '+name+' を '+added+'箇所に追加しました');
   }
   photoData='';editId=null;closeModal();renderContent();
-  saveItemsOnly();
+  saveAll(null);
 }
 function deleteItem(){
   var item=findItem(editId); if(!item)return;
@@ -1105,10 +1086,10 @@ function confirmDel2(){
 }
 function cancelDel(){delType=null;delId=null;closeModal();}
 function execDel(){
-  if(delType==='item'){items=items.filter(function(x){return x.id!==delId;});editId=null;toast('品目を削除しました');closeModal();renderContent();saveItemsOnly();}
+  if(delType==='item'){items=items.filter(function(x){return x.id!==delId;});editId=null;toast('品目を削除しました');closeModal();renderContent();saveAll(null);}
   else if(delType==='member'){var nm=members.find(function(x){return x.id===delId;});var n=nm?nm.name:'';members=members.filter(function(x){return x.id!==delId;});if(n)sites.forEach(function(s){if(s.chief===n)s.chief='';s.leaders=s.leaders.map(function(l){return l===n?'':l;});});toast('メンバーを削除しました');openMembersModal();saveAll(null);}
-  else if(delType==='site'){var sid=delId;items=items.filter(function(x){return x.site!==sid;});sites=sites.filter(function(x){return x.id!==sid;});if(curSiteId===sid&&sites.length>0){curSiteId=sites[0].id;siteIdx=0;}toast('現場を削除しました');openSitesModal();saveItemsOnly();}
-  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('✅ 削除しました');openToolMasterModal();saveTMOnly();}
+  else if(delType==='site'){var sid=delId;items=items.filter(function(x){return x.site!==sid;});sites=sites.filter(function(x){return x.id!==sid;});if(curSiteId===sid&&sites.length>0){curSiteId=sites[0].id;siteIdx=0;}toast('現場を削除しました');openSitesModal();saveAll(null);}
+  else if(delType==='tm'){TM.splice(TM.findIndex(function(x){return x.id===delId;}),1);toast('削除しました');openToolMasterModal();saveAll(null);}
   delType=null;delId=null;
 }
 
@@ -1387,7 +1368,7 @@ function saveSiteEdit(el){
     else{items.push({id:mkId(),name:tm.name,cat:tm.cat||'工具',site:siteId,unit:tm.unit,total:tm.total,qty:e.qty,mach:false,note:'',photo:tm.photo||'',ref:tm.id});}
   });
   closeModal(); toast('現場情報を更新しました'); if(curSiteId)renderContent();
-  saveItemsOnly();
+  saveAll(null);
 }
 function openNewSiteModal(){
   var opts='<option value="">（未設定）</option>'; members.forEach(function(m){if(!m.admin)opts+='<option>'+esc(m.name)+'</option>';});
@@ -1406,7 +1387,7 @@ function saveNewSite(){
   sites.push({id:mkId(),name:name,chief:document.getElementById('ns-chief').value,leaders:[document.getElementById('ns-l0').value,document.getElementById('ns-l1').value,document.getElementById('ns-l2').value],tools:[]});
   closeModal(); toast('現場「'+name+'」を追加しました'); renderSiteScreen();
   if(curSiteId)renderSiteTabs();
-  saveItemsOnly();
+  saveAll(null);
 }
 
 // ============================================================
@@ -1458,9 +1439,9 @@ function openMembersModal(){
 function openMemEditFromBtn(el){editMemIdx=parseInt(el.dataset.idx);openMemEdit();}
 function delMemFromBtn(el){showDeleteConfirm('member',el.dataset.id,el.dataset.name);}
 function openMemAdd(){showModal('<div class="modal-title">メンバー追加</div><label class="lbl">名前</label><input id="mem-name" class="inp" type="text" placeholder="例：田村 健"><div class="modal-actions"><button class="btn-cancel" onclick="openMembersModal()">戻る</button><button class="btn-primary" onclick="saveMemAdd()">追加</button></div>');}
-function saveMemAdd(){var name=document.getElementById('mem-name').value.trim();if(!name){toast('名前を入力してください');return;}members.push({id:mkId(),name:name,admin:false});toast('👤 '+name+' を追加しました');openMembersModal();saveMembersOnly();}
+function saveMemAdd(){var name=document.getElementById('mem-name').value.trim();if(!name){toast('名前を入力してください');return;}members.push({id:mkId(),name:name,admin:false});toast('👤 '+name+' を追加しました');openMembersModal();saveAll(null);}
 function openMemEdit(){var m=members[editMemIdx];if(!m)return;showModal('<div class="modal-title">メンバー編集</div><label class="lbl">名前</label><input id="mem-edit-name" class="inp" type="text" value="'+esc(m.name)+'"><div class="modal-actions"><button class="btn-cancel" onclick="openMembersModal()">戻る</button><button class="btn-primary" onclick="saveMemEdit()">保存</button></div>');}
-function saveMemEdit(){var name=document.getElementById('mem-edit-name').value.trim();if(!name){toast('名前を入力してください');return;}var old=members[editMemIdx].name;members[editMemIdx].name=name;if(old!==name)sites.forEach(function(s){if(s.chief===old)s.chief=name;s.leaders=s.leaders.map(function(l){return l===old?name:l;});});toast('更新しました');openMembersModal();saveMembersOnly();}
+function saveMemEdit(){var name=document.getElementById('mem-edit-name').value.trim();if(!name){toast('名前を入力してください');return;}var old=members[editMemIdx].name;members[editMemIdx].name=name;if(old!==name)sites.forEach(function(s){if(s.chief===old)s.chief=name;s.leaders=s.leaders.map(function(l){return l===old?name:l;});});toast('更新しました');openMembersModal();saveAll(null);}
 
 // ============================================================
 // 工具マスター管理
@@ -1473,7 +1454,6 @@ function renderTMModal(){
   var activeRows={};
   kanas.forEach(function(k){var r=getKanaRow(k);if(r)activeRows[r]=true;});
   var disp=_tmKana?TM.filter(function(t){return (t.yomis||[t.yomi||'']).indexOf(_tmKana)>=0;}):TM;
-  // まず骨格だけ即表示（工具リストはプレースホルダー）
   var h='<div class="modal-title">🔧 工具管理（全体）</div><div class="modal-sub">全体の工具・写真・総数を管理します</div>';
   h+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px">';
   KANA_ROWS.forEach(function(r){
@@ -1495,22 +1475,21 @@ function renderTMModal(){
       h+='</div>';
     }
   }
-  h+='<div id="tm-list-wrap" style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:14px;overflow:hidden;max-height:50vh;overflow-y:auto"><div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px">読み込み中...</div></div>';
+  h+='<div style="background:#fff;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:14px;overflow:hidden;max-height:50vh;overflow-y:auto">';
+  if(!disp.length){h+='<div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px">該当する工具がありません</div>';}
+  disp.forEach(function(t){
+    var photo=t.photo||'';
+    var img=isPhoto(photo)?'<img src="'+photo+'" style="width:64px;height:42px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:11px">':'<div style="width:64px;height:42px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-right:11px">'+esc(photo||'🔧')+'</div>';
+    h+='<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9">'+img;
+    h+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1e293b">'+esc(t.name)+'</div>';
+    h+='<div style="font-size:11px;color:#64748b;margin-top:1px">総数 '+t.total+esc(t.unit)+'</div></div>';
+    h+='<button data-tmid="'+t.id+'" onclick="openTMEdit(this)" style="padding:6px 12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;flex-shrink:0">編集</button>';
+    h+='</div>';
+  });
+  h+='</div>';
   h+='<button class="btn-full" style="background:#1a56db;color:#fff" onclick="openAddTM()">＋ 新しい工具を追加</button>';
   h+='<div class="modal-actions"><button class="btn-cancel" onclick="closeModal()">← 戻る</button></div>';
   showModal(h);
-  // 工具リストはrAFで非同期描画（モーダル表示後に行うためUIブロックなし）
-  requestAnimationFrame(function(){
-    var wrap=document.getElementById('tm-list-wrap');
-    if(!wrap)return;
-    if(!disp.length){wrap.innerHTML='<div style="padding:24px;text-align:center;color:#94a3b8;font-size:12px">該当する工具がありません</div>';return;}
-    var rows=disp.map(function(t){
-      var photo=t.photo||'';
-      var img=isPhoto(photo)?'<img src="'+photo+'" loading="lazy" style="width:64px;height:42px;border-radius:8px;object-fit:contain;background:#fff;border:1px solid #e2e8f0;flex-shrink:0;margin-right:11px">':'<div style="width:64px;height:42px;border-radius:8px;background:#f1f5f9;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;margin-right:11px">'+esc(photo||'🔧')+'</div>';
-      return '<div style="display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid #f1f5f9">'+img+'<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#1e293b">'+esc(t.name)+'</div><div style="font-size:11px;color:#64748b;margin-top:1px">総数 '+t.total+esc(t.unit)+'</div></div><button data-tmid="'+t.id+'" onclick="openTMEdit(this)" style="padding:6px 12px;background:#f1f5f9;color:#475569;border:none;border-radius:8px;font-size:11px;cursor:pointer;font-family:inherit;flex-shrink:0">編集</button></div>';
-    });
-    wrap.innerHTML=rows.join('');
-  });
 }
 function clearTmKanaFilter(){_tmKana='';_tmKanaRow='';renderTMModal();}
 function setTmKanaRow(r){_tmKanaRow=r;_tmKana='';renderTMModal();}
@@ -1535,7 +1514,6 @@ function openTMEdit(el){
   h+='<label class="lbl">総数</label><input id="tme-total" class="inp" type="number" value="'+t.total+'" min="0">';
   h+='<div class="modal-actions"><button class="btn-danger" data-tmid="'+id+'" onclick="deleteTMFromBtn(this)">削除</button><button class="btn-cancel" onclick="renderTMModal()">戻る</button><button class="btn-primary" data-tmid="'+id+'" onclick="saveTMEdit(this)">保存</button></div>';
   window._tmePhotoData=photo;
-  _tmeEditingId=id;
   showModal(h);
 }
 function toggleTMYomi(el){
@@ -1546,52 +1524,25 @@ function toggleTMYomi(el){
   el.style.borderColor=on?'#1a56db':'';
 }
 function triggerTMPhoto(){var e=document.getElementById('tme-photo-inp');if(e)e.click();}
-// 現在編集中のTM id（写真アップ完了後に自動更新するため保持）
-var _tmeEditingId='';
 function handleTMPhoto(e){
   var f=e.target.files[0];if(!f)return;
   var r=new FileReader();
-  r.onload=function(ev){
-    openCropModal(ev.target.result,'tme-photo-area',function(cropped){
-      // まずbase64をセット（UIに即反映）
-      window._tmePhotoData=cropped;
-      // バックグラウンドでDriveにアップロード
-      if(GAS_LOADED){
-        uploadPhoto('1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk', cropped, function(err, url){
-          if(url && url.indexOf('http')===0){
-            window._tmePhotoData=url;
-            // TM配列のデータも即更新（保存ボタン前にURLが確定）
-            var tid=_tmeEditingId;
-            if(tid){
-              var tm=findTM(tid);
-              if(tm){
-                tm.photo=url;
-                items.forEach(function(x){if(x.ref===tid)x.photo=url;});
-                saveTMOnly(); // URLでバックグラウンド保存
-              }
-            }
-          }
-        });
-      }
-    });
-  };
+  r.onload=function(ev){openCropModal(ev.target.result,'tme-photo-area',function(cropped){window._tmePhotoData=cropped;});};
   r.readAsDataURL(f);
 }
 function saveTMEdit(el){
   var id=el.dataset.tmid, t=findTM(id); if(!t)return;
   var name=document.getElementById('tme-name').value.trim();
   if(!name){toast('工具名を入力してください');return;}
+  var oldName=t.name;
   var yomiChks=document.querySelectorAll('.kana-btn.active[data-k]');var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   var newCat=document.getElementById('tme-cat').value||'工具';
-  // _tmePhotoDataはDriveアップ完了後にURLに更新済み（base64の場合はまだアップ中→既存写真を維持）
-  var rawPhoto=window._tmePhotoData||t.photo||'';
-  var newPhoto=(rawPhoto.indexOf('data:')===0)?t.photo||'':rawPhoto;
+  var newPhoto=window._tmePhotoData||t.photo||'';
   t.name=name; t.cat=newCat; t.yomis=yomisArr; t.yomi=yomisArr[0]; t.unit=document.getElementById('tme-unit').value||'個'; t.total=parseInt(document.getElementById('tme-total').value)||0; t.photo=newPhoto;
   items.forEach(function(x){if(x.ref===id){x.name=name;x.cat=newCat;x.photo=newPhoto;}});
-  toast('✅ 更新しました'); window._tmePhotoData='';
-  setTimeout(renderTMModal, 0);
-  saveTMOnly();
+  toast('更新しました'); window._tmePhotoData=''; renderTMModal();
+  saveAll(null);
 }
 function deleteTMFromBtn(el){var t=findTM(el.dataset.tmid);if(t)showDeleteConfirm('tm',el.dataset.tmid,t.name);}
 function openAddTM(){
@@ -1616,9 +1567,8 @@ function saveTM(){
   var yomisArr=Array.from(yomiChks).map(function(b){return b.dataset.k;});
   if(!yomisArr.length){toast('読みを1つ以上選択してください');return;}
   TM.push({id:mkId(),name:name,cat:document.getElementById('tm-cat').value||'工具',yomis:yomisArr,yomi:yomisArr[0],unit:document.getElementById('tm-unit').value.trim()||'個',total:parseInt(document.getElementById('tm-total').value)||0,photo:''});
-  toast('✅ 追加しました：'+name); updateCnts();
-  setTimeout(renderTMModal, 0);
-  saveTMOnly();
+  toast('追加しました：'+name); updateCnts(); renderTMModal();
+  saveAll(null);
 }
 
 // ============================================================
@@ -1707,9 +1657,7 @@ function cfgPrev(v){var p=document.getElementById('cfg-prev');if(p)p.textContent
 function triggerCfgPhoto(){var e=document.getElementById('cfg-photo');if(e)e.click();}
 function handleCfgPhoto(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(ev){cfg.bg=ev.target.result;openAppSettings();};r.readAsDataURL(f);}
 function clearCfgBg(){cfg.bg='';openAppSettings();}
-function saveCfg(){var t=document.getElementById('cfg-title');if(t){var v=t.value.trim();if(v)cfg.title=v;}applyStyle();closeModal();toast('アプリ設定を保存しました');
-  if(GAS_LOADED)gasPost({action:'saveAll',data:{cfg:cfg}},function(){});
-}
+function saveCfg(){var t=document.getElementById('cfg-title');if(t){var v=t.value.trim();if(v)cfg.title=v;}applyStyle();closeModal();toast('アプリ設定を保存しました');saveAll(null);}
 
 // ============================================================
 // 写真クロップ
@@ -1847,8 +1795,28 @@ function cropApply(){
   var target=document.getElementById(_cropTargetId);
   if(target)target.innerHTML='<img src="'+dataUrl+'" alt="">';
   closeCropModal();
-  // コールバックにbase64を渡す（各呼び出し元でDriveアップロードを担当する）
-  if(_cropCallback) _cropCallback(dataUrl);
+  // folderId判定：修理写真か工具写真か
+  var folderId = (_cropTargetId==='repair-photo-area')
+    ? '1PL5JGdGksKFf6QPKmcmOz2XFL7iZiCYH'   // 修理写真フォルダ
+    : '1dlNmY8QWurTyJVbFXi6NY54qG7WIvWAk';   // 工具写真フォルダ
+  // GASへアップロード（バックグラウンド）
+  if(GAS_LOADED){
+    toast('📷 写真をアップロード中...');
+    uploadPhoto(folderId, dataUrl, function(err, url){
+      if(url && url!==dataUrl){
+        // URLが返ってきたらコールバックにURLを渡す
+        if(_cropCallback) _cropCallback(url);
+        // UIの画像はそのまま（base64表示を維持）
+        toast('✅ 写真を保存しました');
+      } else {
+        // フォールバック: base64のままコールバック
+        if(_cropCallback) _cropCallback(dataUrl);
+      }
+    });
+  } else {
+    // オフライン時はbase64のまま
+    if(_cropCallback) _cropCallback(dataUrl);
+  }
 }
 
 // ============================================================
@@ -1896,6 +1864,9 @@ function gasPost(body, cb){
 // ============================================================
 // 写真アップロード（base64 → Google Drive → URL返却）
 // ============================================================
+// folderId: 'tool' か 'repair'
+// base64data: 'data:image/jpeg;base64,...'
+// cb(err, url) : DriveのURL or null
 function uploadPhoto(folderId, base64data, cb){
   if(!base64data||base64data.indexOf('data:')<0){cb(null,'');return;}
   var parts=base64data.split(',');
@@ -1903,36 +1874,42 @@ function uploadPhoto(folderId, base64data, cb){
   var b64=parts[1];
   var ext=mime.indexOf('png')>=0?'.png':'.jpg';
   var fname='photo_'+Date.now()+ext;
-  toast('📷 写真をアップロード中...');
-  // GASはCORSヘッダーを返さないためcredentials不要のfetchで送信
-  fetch(GAS_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'text/plain'},
-    body: JSON.stringify({
-      action: 'uploadPhoto',
-      folderId: folderId,
-      fileName: fname,
-      mimeType: mime,
-      base64: b64
-    }),
-    redirect: 'follow'
-  })
-  .then(function(r){return r.text();})
-  .then(function(txt){
-    var d;
-    try{ d=JSON.parse(txt); }catch(e){ d=null; }
-    if(d && d.url){
-      toast('✅ 写真を保存しました');
-      cb(null, d.url);
-    } else {
-      console.warn('uploadPhoto: URLなし', txt);
-      cb(null, base64data);
+  // base64を小さいチャンクに分けてGETで順番に送信
+  var CHUNK=1500;
+  var chunks=[];
+  for(var i=0;i<b64.length;i+=CHUNK) chunks.push(b64.slice(i,i+CHUNK));
+  var total=chunks.length;
+  function sendChunk(idx){
+    if(idx>=total){
+      // 全チャンク送信完了 → URLを取得
+      setTimeout(function(){
+        fetch(GAS_URL+'?action=getPhotoUrl&folderId='+encodeURIComponent(folderId)+'&fileName='+encodeURIComponent(fname),{redirect:'follow'})
+        .then(function(r){return r.json();})
+        .then(function(d){
+          if(d&&d.url){cb(null,d.url);}
+          else{cb(null,base64data);}
+        })
+        .catch(function(){cb(null,base64data);});
+      },2000);
+      return;
     }
-  })
-  .catch(function(e){
-    console.warn('uploadPhoto失敗', e);
-    cb(null, base64data);
-  });
+    var url=GAS_URL+'?action=uploadChunk'
+      +'&folderId='+encodeURIComponent(folderId)
+      +'&fileName='+encodeURIComponent(fname)
+      +'&mimeType='+encodeURIComponent(mime)
+      +'&chunk='+encodeURIComponent(chunks[idx])
+      +'&idx='+idx
+      +'&total='+total;
+    fetch(url,{redirect:'follow'})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(d&&d.status==='ok'){sendChunk(idx+1);}
+      else{cb(null,base64data);}
+    })
+    .catch(function(){cb(null,base64data);});
+  }
+  toast('📷 写真をアップロード中...');
+  sendChunk(0);
 }
 
 // ============================================================
@@ -1984,75 +1961,31 @@ function loadAll(){
 }
 
 // ============================================================
-// 全データ保存（バックグラウンド・ローディングなし）
+// 全データ保存（操作後に呼ぶ）
 // ============================================================
-var _saveTimer=null;
 function saveAll(cb){
-  if(!GAS_LOADED){if(cb)cb();return;}
-  if(cb)cb(); // UIはすぐに戻す
-  // 既存タイマーをキャンセルして少し遅延させ連続操作をまとめる
-  if(_saveTimer)clearTimeout(_saveTimer);
-  _saveTimer=setTimeout(function(){
-    _saveTimer=null;
-    gasPost({
-      action:'saveAll',
-      data:{
-        cfg:cfg,
-        members:members,
-        sites:sites,
-        TM:TM.map(function(t){var p=t.photo||'';return Object.assign({},t,{photo:p.indexOf('data:')===0?'':p});}),
-        items:items.map(function(x){var p=x.photo||'';return Object.assign({},x,{photo:p.indexOf('data:')===0?'':p});}),
-        hist:hist,
-        repairs:repairs.map(function(r){var p=r.photo||'';return Object.assign({},r,{photo:p.indexOf('data:')===0?'':p});})
-      }
-    },function(err){
-      if(err)console.warn('saveAll失敗',err);
-    });
-  },400);
-}
-
-// TMのみ差分保存（工具マスター編集時）
-var _saveTMTimer=null;
-function saveTMOnly(){
-  if(!GAS_LOADED)return;
-  if(_saveTMTimer)clearTimeout(_saveTMTimer);
-  _saveTMTimer=setTimeout(function(){
-    _saveTMTimer=null;
-    gasPost({
-      action:'saveAll',
-      data:{
-        TM:TM.map(function(t){var p=t.photo||'';return Object.assign({},t,{photo:p.indexOf('data:')===0?'':p});})
-      }
-    },function(err){if(err)console.warn('saveTM失敗',err);});
-  },400);
-}
-
-// items+sitesのみ差分保存（現場編集・品目編集時）
-var _saveItemsTimer=null;
-function saveItemsOnly(){
-  if(!GAS_LOADED)return;
-  if(_saveItemsTimer)clearTimeout(_saveItemsTimer);
-  _saveItemsTimer=setTimeout(function(){
-    _saveItemsTimer=null;
-    gasPost({
-      action:'saveAll',
-      data:{
-        sites:sites,
-        items:items.map(function(x){var p=x.photo||'';return Object.assign({},x,{photo:p.indexOf('data:')===0?'':p});})
-      }
-    },function(err){if(err)console.warn('saveItems失敗',err);});
-  },400);
-}
-
-// membersのみ差分保存
-var _saveMemTimer=null;
-function saveMembersOnly(){
-  if(!GAS_LOADED)return;
-  if(_saveMemTimer)clearTimeout(_saveMemTimer);
-  _saveMemTimer=setTimeout(function(){
-    _saveMemTimer=null;
-    gasPost({action:'saveAll',data:{members:members}},function(err){if(err)console.warn('saveMembers失敗',err);});
-  },400);
+  if(!GAS_LOADED) { if(cb)cb(); return; } // オフライン時はスキップ
+  showLoading('保存中...');
+  // 写真(base64)はスプレッドシートに保存しない（URLのみ保存）
+  gasPost({
+    action:'saveAll',
+    data:{
+      cfg:cfg,
+      members:members,
+      sites:sites,
+      TM:TM.map(function(t){var p=t.photo||'';return Object.assign({},t,{photo:p.indexOf('data:')===0?'':p});}),
+      items:items.map(function(x){var p=x.photo||'';return Object.assign({},x,{photo:p.indexOf('data:')===0?'':p});}),
+      hist:hist,
+      repairs:repairs.map(function(r){var p=r.photo||'';return Object.assign({},r,{photo:p.indexOf('data:')===0?'':p});})
+    }
+  },function(err,res){
+    hideLoading();
+    if(err||!res||res.status!=='ok'){
+      console.warn('保存失敗',err,res);
+      toast('⚠ 保存に失敗しました（通信エラー）');
+    }
+    if(cb)cb();
+  });
 }
 
 // ============================================================
